@@ -31,6 +31,11 @@ public partial class MainWindowViewModel : ObservableObject
     private readonly TimeProvider _time;
     private readonly IMcpServerHost _mcpHost;
     private readonly DispatcherTimer _countdownTimer;
+    private readonly DispatcherTimer _searchDebounceTimer;
+
+    /// <summary>Row view models by session id, reused across rebuilds so unchanged rows
+    /// keep their containers instead of re-resolving every style and dynamic resource.</summary>
+    private readonly Dictionary<Guid, SessionItemViewModel> _sessionItemCache = [];
 
     public MainWindowViewModel(
         WorkspaceState state,
@@ -57,16 +62,9 @@ public partial class MainWindowViewModel : ObservableObject
         _sessionManager.SessionChanged += (_, e) =>
             Dispatcher.UIThread.Post(() =>
             {
-                foreach (var group in AccountGroups)
-                {
-                    var item = group.Sessions.FirstOrDefault(s => s.Id == e.Session.Id);
-                    if (item is not null)
-                    {
-                        item.RaiseChanged();
-                        group.RaiseChanged();
-                        return;
-                    }
-                }
+                if (_sessionItemCache.TryGetValue(e.Session.Id, out var item))
+                    item.RaiseChanged();
+                _groups.FirstOrDefault(g => g.AccountId == e.Session.AccountId)?.RaiseChanged();
             });
 
         _mcpHost.StatusChanged += (_, _) =>
@@ -98,6 +96,13 @@ public partial class MainWindowViewModel : ObservableObject
             });
         _countdownTimer.Start();
 
+        _searchDebounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
+        _searchDebounceTimer.Tick += (_, _) =>
+        {
+            _searchDebounceTimer.Stop();
+            RebuildSessions();
+        };
+
         RebuildIntegrations();
         RebuildSessions();
     }
@@ -105,7 +110,12 @@ public partial class MainWindowViewModel : ObservableObject
     public ISukiDialogManager DialogManager { get; }
 
     public ObservableCollection<IntegrationItemViewModel> Integrations { get; } = [];
-    public ObservableCollection<AccountGroupViewModel> AccountGroups { get; } = [];
+
+    /// <summary>Account headers and the session rows of expanded accounts, flattened into one
+    /// list so a single virtualizing ItemsControl can render the table.</summary>
+    public ObservableCollection<object> Rows { get; } = [];
+
+    private readonly List<AccountGroupViewModel> _groups = [];
 
     [ObservableProperty]
     private string _searchText = string.Empty;
@@ -140,7 +150,7 @@ public partial class MainWindowViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(StatusHeader))]
     private bool _sortAscending = true;
 
-    public bool HasNoSessions => AccountGroups.Count == 0;
+    public bool HasNoSessions => _groups.Count == 0;
 
     public bool IsMcpRunning => _mcpHost.IsRunning;
 
@@ -156,7 +166,12 @@ public partial class MainWindowViewModel : ObservableObject
     private string HeaderFor(string title, SessionSortColumn column) =>
         SortColumn == column ? $"{title} {(SortAscending ? "▲" : "▼")}" : title;
 
-    partial void OnSearchTextChanged(string value) => RebuildSessions();
+    // Coalesces rapid typing into a single rebuild.
+    partial void OnSearchTextChanged(string value)
+    {
+        _searchDebounceTimer.Stop();
+        _searchDebounceTimer.Start();
+    }
 
     partial void OnSelectedIntegrationChanged(IntegrationItemViewModel? value) => RebuildSessions();
 
@@ -273,7 +288,7 @@ public partial class MainWindowViewModel : ObservableObject
         await GuardAsync(() => _sessionManager.StartSessionAsync(item.Id));
         foreach (var session in AllSessions())
             session.RaiseChanged();
-        foreach (var group in AccountGroups)
+        foreach (var group in _groups)
             group.RaiseChanged();
     }
 
@@ -400,7 +415,7 @@ public partial class MainWindowViewModel : ObservableObject
     }
 
     private IEnumerable<SessionItemViewModel> AllSessions() =>
-        AccountGroups.SelectMany(g => g.Sessions);
+        _groups.SelectMany(g => g.Sessions);
 
     private void RebuildIntegrations()
     {
@@ -413,8 +428,8 @@ public partial class MainWindowViewModel : ObservableObject
 
     private void RebuildSessions()
     {
-        var expandedState = AccountGroups.ToDictionary(g => g.AccountId, g => g.IsExpanded);
-        AccountGroups.Clear();
+        // A direct rebuild supersedes any rebuild the search debounce still has pending.
+        _searchDebounceTimer.Stop();
 
         var query = _state.Workspace.Sessions.AsEnumerable();
         if (SelectedIntegration is { } selected)
@@ -428,26 +443,117 @@ public partial class MainWindowViewModel : ObservableObject
                 || s.ProfileName.Contains(search, StringComparison.OrdinalIgnoreCase));
         }
 
-        var groups = query
-            .GroupBy(s => (s.AccountId, s.AccountName))
-            .Select(g =>
-            {
-                var group = new AccountGroupViewModel(g.Key.AccountName, g.Key.AccountId);
-                if (expandedState.TryGetValue(g.Key.AccountId, out var wasExpanded))
-                    group.IsExpanded = wasExpanded;
-                foreach (var session in SortSessions(g))
-                    group.Sessions.Add(new SessionItemViewModel(session, _time));
-                return group;
-            });
-
+        var grouped = query.GroupBy(s => (s.AccountId, s.AccountName));
         var ordered = SortColumn == SessionSortColumn.Account && !SortAscending
-            ? groups.OrderByDescending(g => g.AccountName, StringComparer.OrdinalIgnoreCase)
-            : groups.OrderBy(g => g.AccountName, StringComparer.OrdinalIgnoreCase);
+            ? grouped.OrderByDescending(g => g.Key.AccountName, StringComparer.OrdinalIgnoreCase)
+            : grouped.OrderBy(g => g.Key.AccountName, StringComparer.OrdinalIgnoreCase);
 
-        foreach (var group in ordered)
-            AccountGroups.Add(group);
+        var existingGroups = new Dictionary<string, AccountGroupViewModel>();
+        foreach (var group in _groups)
+            existingGroups.TryAdd(group.AccountId, group);
 
+        _groups.Clear();
+        foreach (var g in ordered)
+        {
+            if (!existingGroups.TryGetValue(g.Key.AccountId, out var group)
+                || !string.Equals(group.AccountName, g.Key.AccountName, StringComparison.Ordinal))
+            {
+                var replaced = group;
+                group = new AccountGroupViewModel(g.Key.AccountName, g.Key.AccountId);
+                if (replaced is not null)
+                    group.IsExpanded = replaced.IsExpanded;
+                group.PropertyChanged += OnGroupPropertyChanged;
+            }
+
+            SyncCollection(group.Sessions, SortSessions(g).Select(GetOrCreateSessionItem).ToList());
+            _groups.Add(group);
+        }
+
+        SyncRows();
+
+        // Reused rows read the session lazily; re-evaluate their bindings in place.
+        foreach (var group in _groups)
+        {
+            group.RaiseChanged();
+            foreach (var session in group.Sessions)
+                session.RaiseChanged();
+        }
+
+        PruneSessionItemCache();
         OnPropertyChanged(nameof(HasNoSessions));
+    }
+
+    private void OnGroupPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(AccountGroupViewModel.IsExpanded))
+            SyncRows();
+    }
+
+    /// <summary>Projects the groups into the flat row list the virtualized table binds to.</summary>
+    private void SyncRows()
+    {
+        var desired = new List<object>();
+        foreach (var group in _groups)
+        {
+            desired.Add(group);
+            if (group.IsExpanded)
+                desired.AddRange(group.Sessions);
+        }
+
+        SyncCollection(Rows, desired);
+    }
+
+    private SessionItemViewModel GetOrCreateSessionItem(AwsSession session)
+    {
+        if (!_sessionItemCache.TryGetValue(session.Id, out var item))
+            _sessionItemCache[session.Id] = item = new SessionItemViewModel(session, _time);
+        return item;
+    }
+
+    private void PruneSessionItemCache()
+    {
+        var live = _state.Workspace.Sessions.Select(s => s.Id).ToHashSet();
+        foreach (var stale in _sessionItemCache.Keys.Where(id => !live.Contains(id)).ToList())
+            _sessionItemCache.Remove(stale);
+    }
+
+    /// <summary>Applies minimal inserts, moves, and removals so entries already in place keep
+    /// their item containers (a Clear/re-add tears down and rebuilds every row). Assumes the
+    /// desired entries are distinct. Departed entries are removed first so the survivors stay
+    /// aligned; otherwise a removal in the middle (collapsing a group) degrades into one Move
+    /// event, and a container shuffle, per row below it.</summary>
+    private static void SyncCollection<T>(ObservableCollection<T> target, IReadOnlyList<T> desired) where T : class
+    {
+        var desiredSet = new HashSet<T>(desired);
+        for (var i = target.Count - 1; i >= 0; i--)
+        {
+            if (!desiredSet.Contains(target[i]))
+                target.RemoveAt(i);
+        }
+
+        for (var i = 0; i < desired.Count; i++)
+        {
+            if (i < target.Count && ReferenceEquals(target[i], desired[i]))
+                continue;
+
+            // The prefix already matches, so if the entry is present it sits past i.
+            var existingIndex = IndexOfFrom(target, desired[i], i + 1);
+            if (existingIndex > i)
+                target.Move(existingIndex, i);
+            else
+                target.Insert(i, desired[i]);
+        }
+    }
+
+    private static int IndexOfFrom<T>(ObservableCollection<T> target, T item, int start) where T : class
+    {
+        for (var i = start; i < target.Count; i++)
+        {
+            if (ReferenceEquals(target[i], item))
+                return i;
+        }
+
+        return -1;
     }
 
     private IEnumerable<AwsSession> SortSessions(IEnumerable<AwsSession> sessions)

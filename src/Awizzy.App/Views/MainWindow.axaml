@@ -175,38 +175,47 @@
                     <TextBlock Text="Syncing accounts and roles…" VerticalAlignment="Center" Opacity="0.8" />
                 </StackPanel>
             </Border>
-            <ScrollViewer Grid.Row="2">
-                <ItemsControl ItemsSource="{Binding AccountGroups}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="vm:AccountGroupViewModel">
-                            <StackPanel Margin="0,0,0,4">
-                                <!-- Account header row -->
-                                <ToggleButton IsChecked="{Binding IsExpanded}"
-                                              Theme="{StaticResource AccountRowToggleTheme}"
-                                              HorizontalAlignment="Stretch">
-                                    <Grid ColumnDefinitions="28,*,140">
-                                        <PathIcon Grid.Column="0" Data="{x:Static sukiContent:Icons.ChevronRight}"
-                                                  Width="10" Height="10"
-                                                  VerticalAlignment="Center" HorizontalAlignment="Left"
-                                                  IsVisible="{Binding !IsExpanded}" />
-                                        <PathIcon Grid.Column="0" Data="{x:Static sukiContent:Icons.ChevronDown}"
-                                                  Width="10" Height="10"
-                                                  VerticalAlignment="Center" HorizontalAlignment="Left"
-                                                  IsVisible="{Binding IsExpanded}" />
-                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
-                                            <TextBlock Text="{Binding AccountName}" FontWeight="SemiBold" />
-                                            <TextBlock Text="{Binding AccountId}" Opacity="0.6" FontSize="12"
-                                                       VerticalAlignment="Center" />
-                                        </StackPanel>
-                                        <TextBlock Grid.Column="2" Text="{Binding SummaryText}" Opacity="0.7"
-                                                   FontSize="12" VerticalAlignment="Center" />
-                                    </Grid>
-                                </ToggleButton>
-
-                                <!-- Role rows -->
-                                <ItemsControl ItemsSource="{Binding Sessions}" IsVisible="{Binding IsExpanded}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate x:DataType="vm:SessionItemViewModel">
+            <!-- One flat virtualized list: account headers and session rows are picked
+                 by item type, so only the viewport's rows ever get realized. -->
+            <ItemsControl Grid.Row="2" ItemsSource="{Binding Rows}">
+                <ItemsControl.Template>
+                    <ControlTemplate>
+                        <ScrollViewer>
+                            <ItemsPresenter />
+                        </ScrollViewer>
+                    </ControlTemplate>
+                </ItemsControl.Template>
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <VirtualizingStackPanel />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.DataTemplates>
+                    <DataTemplate DataType="vm:AccountGroupViewModel">
+                        <!-- Account header row -->
+                        <ToggleButton IsChecked="{Binding IsExpanded}"
+                                      Theme="{StaticResource AccountRowToggleTheme}"
+                                      HorizontalAlignment="Stretch" Margin="0,0,0,4">
+                            <Grid ColumnDefinitions="28,*,140">
+                                <PathIcon Grid.Column="0" Data="{x:Static sukiContent:Icons.ChevronRight}"
+                                          Width="10" Height="10"
+                                          VerticalAlignment="Center" HorizontalAlignment="Left"
+                                          IsVisible="{Binding !IsExpanded}" />
+                                <PathIcon Grid.Column="0" Data="{x:Static sukiContent:Icons.ChevronDown}"
+                                          Width="10" Height="10"
+                                          VerticalAlignment="Center" HorizontalAlignment="Left"
+                                          IsVisible="{Binding IsExpanded}" />
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
+                                    <TextBlock Text="{Binding AccountName}" FontWeight="SemiBold" />
+                                    <TextBlock Text="{Binding AccountId}" Opacity="0.6" FontSize="12"
+                                               VerticalAlignment="Center" />
+                                </StackPanel>
+                                <TextBlock Grid.Column="2" Text="{Binding SummaryText}" Opacity="0.7"
+                                           FontSize="12" VerticalAlignment="Center" />
+                            </Grid>
+                        </ToggleButton>
+                    </DataTemplate>
+                    <DataTemplate DataType="vm:SessionItemViewModel">
                                             <Grid ColumnDefinitions="28,*,150,115,125,195" Margin="0,4">
                                                 <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center"
                                                             Margin="0,0,8,0">
@@ -289,14 +298,9 @@
                                                     </Button>
                                                 </StackPanel>
                                             </Grid>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </StackPanel>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </ScrollViewer>
+                    </DataTemplate>
+                </ItemsControl.DataTemplates>
+            </ItemsControl>
         </Grid>
 
         <!-- Status bar -->
