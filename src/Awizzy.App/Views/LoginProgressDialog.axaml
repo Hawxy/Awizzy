@@ -1,0 +1,21 @@
+<suki:SukiWindow xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Awizzy.App.ViewModels"
+        xmlns:suki="using:SukiUI.Controls"
+        x:Class="Awizzy.App.Views.LoginProgressDialog"
+        x:DataType="vm:LoginDialogViewModel"
+        Title="Log in to AWS"
+        Width="420" SizeToContent="Height" CanResize="False"
+        CanFullScreen="False" CanPin="False"
+        BackgroundStyle="Flat"
+        WindowStartupLocation="CenterOwner">
+    <StackPanel Margin="24" Spacing="16">
+        <TextBlock Text="{Binding StatusText}" TextWrapping="Wrap" />
+        <TextBlock Text="{Binding UserCode}"
+                   FontSize="28" FontWeight="Bold" LetterSpacing="2"
+                   HorizontalAlignment="Center"
+                   IsVisible="{Binding !Failed}" />
+        <ProgressBar IsIndeterminate="True" IsVisible="{Binding !Failed}" />
+        <Button Content="Cancel" HorizontalAlignment="Right" Command="{Binding CancelCommand}" />
+    </StackPanel>
+</suki:SukiWindow>

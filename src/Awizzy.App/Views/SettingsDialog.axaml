@@ -1,0 +1,49 @@
+<suki:SukiWindow xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Awizzy.App.ViewModels"
+        xmlns:suki="using:SukiUI.Controls"
+        x:Class="Awizzy.App.Views.SettingsDialog"
+        x:DataType="vm:SettingsDialogViewModel"
+        Title="Settings"
+        Width="520" SizeToContent="Height" CanResize="False"
+        CanFullScreen="False" CanPin="False"
+        BackgroundStyle="Flat"
+        WindowStartupLocation="CenterOwner">
+    <VisualLayerManager>
+    <StackPanel Margin="20" Spacing="12">
+        <StackPanel Spacing="4">
+            <TextBlock Text="Refresh margin (minutes before expiry)" />
+            <NumericUpDown Value="{Binding RefreshMarginMinutes}" Minimum="1" Maximum="55"
+                           Increment="1" FormatString="0" HorizontalAlignment="Stretch" />
+        </StackPanel>
+        <StackPanel Spacing="4">
+            <TextBlock Text="Credentials file path" />
+            <TextBox Text="{Binding CredentialsFilePath}"
+                     PlaceholderText="{Binding DefaultCredentialsPath}" />
+            <TextBlock Text="Leave empty to use the default shown above. Changing this stops active sessions."
+                       FontSize="12" Opacity="0.7" TextWrapping="Wrap" />
+        </StackPanel>
+        <StackPanel Spacing="4">
+            <TextBlock Text="Theme" />
+            <ComboBox ItemsSource="{Binding Themes}" SelectedItem="{Binding Theme}"
+                      HorizontalAlignment="Stretch" />
+        </StackPanel>
+        <StackPanel Spacing="4">
+            <Grid ColumnDefinitions="*,130">
+                <CheckBox Grid.Column="0" Content="Enable local MCP server"
+                          IsChecked="{Binding McpServerEnabled}" VerticalAlignment="Center" />
+                <NumericUpDown Grid.Column="1" Value="{Binding McpServerPort}"
+                               Minimum="1024" Maximum="65535" Increment="1" FormatString="0"
+                               IsEnabled="{Binding McpServerEnabled}" />
+            </Grid>
+            <TextBlock Text="Lets local AI tools (e.g. Claude Code) list, start, and stop sessions over HTTP on localhost. Any process on this machine can reach it while enabled."
+                       FontSize="12" Opacity="0.7" TextWrapping="Wrap" />
+        </StackPanel>
+        <TextBlock x:Name="ErrorText" Foreground="{DynamicResource SukiDangerColor}" TextWrapping="Wrap" IsVisible="False" />
+        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" Margin="0,8,0,0">
+            <Button Content="Cancel" Click="OnCancel" />
+            <Button Content="Save" Classes="Flat" Click="OnSave" IsDefault="True" />
+        </StackPanel>
+    </StackPanel>
+    </VisualLayerManager>
+</suki:SukiWindow>

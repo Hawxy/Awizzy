@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Awizzy.App/Awizzy.App.csproj" />
+    <Project Path="src/Awizzy.Core/Awizzy.Core.csproj" />
+    <Project Path="src/Awizzy.Mcp/Awizzy.Mcp.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Awizzy.Core.Tests/Awizzy.Core.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,311 @@
+<suki:SukiWindow xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Awizzy.App.ViewModels"
+        xmlns:suki="using:SukiUI.Controls"
+        xmlns:sukiContent="using:SukiUI.Content"
+        xmlns:sukiTheme="using:SukiUI.Theme"
+        x:Class="Awizzy.App.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="Awizzy"
+        Icon="/Assets/app-icon.ico"
+        Width="1100" Height="680" MinWidth="900" MinHeight="420"
+        BackgroundStyle="GradientSoft"
+        WindowStartupLocation="CenterScreen">
+    <suki:SukiWindow.Hosts>
+        <suki:SukiDialogHost Manager="{Binding DialogManager}" />
+    </suki:SukiWindow.Hosts>
+    <suki:SukiWindow.RightWindowTitleBarControls>
+        <Button Classes="Basic WindowControlsButton" ToolTip.Tip="Settings"
+                Command="{Binding OpenSettingsCommand}">
+            <PathIcon Data="{StaticResource IconCog}" Width="14" Height="14" />
+        </Button>
+    </suki:SukiWindow.RightWindowTitleBarControls>
+    <suki:SukiWindow.Resources>
+        <!-- SukiUI's button template lays content out in a horizontal StackPanel, which cannot
+             stretch the row grid, so the account row uses its own minimal template. -->
+        <ControlTheme x:Key="AccountRowToggleTheme" TargetType="ToggleButton">
+            <Setter Property="Background" Value="{DynamicResource SukiCardBackground}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SukiControlBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="8,8" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          HorizontalContentAlignment="Stretch"
+                                          VerticalContentAlignment="Center" />
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+            <Style Selector="^:pointerover /template/ Border">
+                <Setter Property="Background" Value="{DynamicResource SukiLightBackground}" />
+            </Style>
+        </ControlTheme>
+    </suki:SukiWindow.Resources>
+    <suki:SukiWindow.Styles>
+        <Style Selector="Button.sortHeader">
+            <Setter Property="Padding" Value="6,4" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+        </Style>
+    </suki:SukiWindow.Styles>
+    <!-- SukiUI 7.0.1's window template lacks a VisualLayerManager, so Avalonia has no
+         light-dismiss layer and flyouts never close on outside clicks; provide one here. -->
+    <VisualLayerManager>
+    <Grid ColumnDefinitions="280,*" RowDefinitions="*,Auto">
+
+        <!-- Sidebar: integrations -->
+        <Border Grid.Column="0" Grid.Row="0" Grid.RowSpan="2"
+                Background="{DynamicResource SukiGlassCardBackground}"
+                BorderBrush="{DynamicResource SukiBorderBrush}"
+                BorderThickness="0,0,1,0">
+            <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="12">
+                <TextBlock Grid.Row="0" Text="Integrations" FontSize="16" FontWeight="SemiBold" Margin="4,4,4,8" />
+                <Button Grid.Row="1" Classes="Flat" HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Center" Margin="0,0,0,12"
+                        Command="{Binding AddIntegrationCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <PathIcon Data="{x:Static sukiContent:Icons.Plus}" Width="12" Height="12" />
+                        <TextBlock Text="Add integration" />
+                    </StackPanel>
+                </Button>
+                <ListBox Grid.Row="2"
+                         ItemsSource="{Binding Integrations}"
+                         SelectedItem="{Binding SelectedIntegration}"
+                         Background="Transparent">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:IntegrationItemViewModel">
+                            <StackPanel Spacing="2" Margin="0,4">
+                                <TextBlock Text="{Binding Alias}" FontWeight="SemiBold" />
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <Ellipse Width="8" Height="8" VerticalAlignment="Center">
+                                        <Ellipse.Fill>
+                                            <SolidColorBrush Color="{Binding IsLoggedIn, Converter={StaticResource BoolToStatusColor}}" />
+                                        </Ellipse.Fill>
+                                    </Ellipse>
+                                    <TextBlock Text="{Binding StatusText}" FontSize="12" Opacity="0.7" />
+                                    <TextBlock Text="{Binding Region}" FontSize="12" Opacity="0.7" />
+                                </StackPanel>
+                                <TextBlock Text="{Binding LastSyncText}" FontSize="11" Opacity="0.55" />
+                                <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,4,0,0">
+                                    <Button Content="Login" FontSize="12" Padding="8,2"
+                                            IsEnabled="{Binding CanLogin}"
+                                            Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).LoginCommand}"
+                                            CommandParameter="{Binding}" />
+                                    <Button Content="Sync" FontSize="12" Padding="8,2"
+                                            IsEnabled="{Binding !IsSyncing}"
+                                            sukiTheme:ButtonExtensions.ShowProgress="{Binding IsSyncing}"
+                                            Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).SyncCommand}"
+                                            CommandParameter="{Binding}" />
+                                    <Button Content="⋯" FontSize="12" Padding="8,2">
+                                        <Button.Flyout>
+                                            <MenuFlyout>
+                                                <MenuItem Header="Edit"
+                                                          Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).EditIntegrationCommand}"
+                                                          CommandParameter="{Binding}" />
+                                                <MenuItem Header="Log out"
+                                                          Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).LogoutCommand}"
+                                                          CommandParameter="{Binding}" />
+                                                <MenuItem Header="Delete"
+                                                          Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).DeleteIntegrationCommand}"
+                                                          CommandParameter="{Binding}" />
+                                            </MenuFlyout>
+                                        </Button.Flyout>
+                                    </Button>
+                                </StackPanel>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+                <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="6" Margin="4,12,4,0"
+                            ToolTip.Tip="Local MCP server for AI tools; enable it in Settings.">
+                    <Ellipse Width="8" Height="8" VerticalAlignment="Center">
+                        <Ellipse.Fill>
+                            <SolidColorBrush Color="{Binding IsMcpRunning, Converter={StaticResource BoolToStatusColor}}" />
+                        </Ellipse.Fill>
+                    </Ellipse>
+                    <TextBlock Text="{Binding McpStatusText}" FontSize="11" Opacity="0.7"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Main pane: sessions grouped by account -->
+        <Grid Grid.Column="1" Grid.Row="0" RowDefinitions="Auto,Auto,*" Margin="16,12,16,0">
+            <TextBox Grid.Row="0" Text="{Binding SearchText}"
+                     PlaceholderText="Search account, role, profile, or account id…"
+                     Margin="0,0,0,8" />
+
+            <!-- Sortable column headers, aligned with the row grid below -->
+            <Grid Grid.Row="1" ColumnDefinitions="28,*,150,115,125,195" Margin="0,0,0,4">
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <Button Content="{Binding AccountHeader}" Classes="Basic sortHeader"
+                            Command="{Binding ToggleSortCommand}"
+                            CommandParameter="{x:Static vm:SessionSortColumn.Account}" />
+                    <Button Content="{Binding RoleHeader}" Classes="Basic sortHeader"
+                            Command="{Binding ToggleSortCommand}"
+                            CommandParameter="{x:Static vm:SessionSortColumn.Role}" />
+                </StackPanel>
+                <Button Grid.Column="2" Content="{Binding ProfileHeader}" Classes="Basic sortHeader"
+                        Command="{Binding ToggleSortCommand}"
+                        CommandParameter="{x:Static vm:SessionSortColumn.Profile}" />
+                <Button Grid.Column="3" Content="{Binding RegionHeader}" Classes="Basic sortHeader"
+                        Command="{Binding ToggleSortCommand}"
+                        CommandParameter="{x:Static vm:SessionSortColumn.Region}" />
+                <Button Grid.Column="4" Content="{Binding StatusHeader}" Classes="Basic sortHeader"
+                        Command="{Binding ToggleSortCommand}"
+                        CommandParameter="{x:Static vm:SessionSortColumn.Status}" />
+            </Grid>
+
+            <Border Grid.Row="2" IsVisible="{Binding IsAnySyncing}" ZIndex="1"
+                    Background="{DynamicResource SukiGlassCardOpaqueBackground}"
+                    BorderBrush="{DynamicResource SukiBorderBrush}" BorderThickness="1"
+                    CornerRadius="8" Padding="20,14"
+                    HorizontalAlignment="Center" VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <suki:Loading Width="36" Height="36" />
+                    <TextBlock Text="Syncing accounts and roles…" VerticalAlignment="Center" Opacity="0.8" />
+                </StackPanel>
+            </Border>
+            <ScrollViewer Grid.Row="2">
+                <ItemsControl ItemsSource="{Binding AccountGroups}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:AccountGroupViewModel">
+                            <StackPanel Margin="0,0,0,4">
+                                <!-- Account header row -->
+                                <ToggleButton IsChecked="{Binding IsExpanded}"
+                                              Theme="{StaticResource AccountRowToggleTheme}"
+                                              HorizontalAlignment="Stretch">
+                                    <Grid ColumnDefinitions="28,*,140">
+                                        <PathIcon Grid.Column="0" Data="{x:Static sukiContent:Icons.ChevronRight}"
+                                                  Width="10" Height="10"
+                                                  VerticalAlignment="Center" HorizontalAlignment="Left"
+                                                  IsVisible="{Binding !IsExpanded}" />
+                                        <PathIcon Grid.Column="0" Data="{x:Static sukiContent:Icons.ChevronDown}"
+                                                  Width="10" Height="10"
+                                                  VerticalAlignment="Center" HorizontalAlignment="Left"
+                                                  IsVisible="{Binding IsExpanded}" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
+                                            <TextBlock Text="{Binding AccountName}" FontWeight="SemiBold" />
+                                            <TextBlock Text="{Binding AccountId}" Opacity="0.6" FontSize="12"
+                                                       VerticalAlignment="Center" />
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="2" Text="{Binding SummaryText}" Opacity="0.7"
+                                                   FontSize="12" VerticalAlignment="Center" />
+                                    </Grid>
+                                </ToggleButton>
+
+                                <!-- Role rows -->
+                                <ItemsControl ItemsSource="{Binding Sessions}" IsVisible="{Binding IsExpanded}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:SessionItemViewModel">
+                                            <Grid ColumnDefinitions="28,*,150,115,125,195" Margin="0,4">
+                                                <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center"
+                                                            Margin="0,0,8,0">
+                                                    <TextBlock Text="{Binding RoleName}" TextTrimming="CharacterEllipsis"
+                                                               ToolTip.Tip="{Binding RoleName}" />
+                                                    <TextBlock Text="{Binding ErrorMessage}" FontSize="12"
+                                                               Foreground="{DynamicResource SukiDangerColor}" TextWrapping="Wrap"
+                                                               IsVisible="{Binding HasError}" />
+                                                </StackPanel>
+                                                <TextBlock Grid.Column="2" Text="{Binding ProfileName}"
+                                                           VerticalAlignment="Center" Opacity="0.9"
+                                                           TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
+                                                <TextBlock Grid.Column="3" Text="{Binding Region}"
+                                                           VerticalAlignment="Center" Opacity="0.9" />
+                                                <StackPanel Grid.Column="4" VerticalAlignment="Center" Spacing="2">
+                                                    <Border Background="{Binding State, Converter={StaticResource StateToChipBrush}}"
+                                                            CornerRadius="9" Padding="8,2" HorizontalAlignment="Left">
+                                                        <TextBlock Text="{Binding StateText}" FontSize="11"
+                                                                   FontWeight="SemiBold" Foreground="White" />
+                                                    </Border>
+                                                    <TextBlock Text="{Binding ExpiryText}" FontSize="11" Opacity="0.7"
+                                                               IsVisible="{Binding HasExpiry}" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="5" VerticalAlignment="Center"
+                                                            Orientation="Horizontal" Spacing="4">
+                                                    <Button Classes="Flat" Padding="10,4"
+                                                            IsVisible="{Binding !IsActive}" IsEnabled="{Binding !IsBusy}"
+                                                            Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).StartSessionCommand}"
+                                                            CommandParameter="{Binding}">
+                                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                                            <PathIcon Data="{StaticResource IconPlay}" Width="12" Height="12" />
+                                                            <TextBlock Text="Start" />
+                                                        </StackPanel>
+                                                    </Button>
+                                                    <Button Padding="10,4"
+                                                            IsVisible="{Binding IsActive}"
+                                                            Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).StopSessionCommand}"
+                                                            CommandParameter="{Binding}">
+                                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                                            <PathIcon Data="{StaticResource IconStop}" Width="12" Height="12" />
+                                                            <TextBlock Text="Stop" />
+                                                        </StackPanel>
+                                                    </Button>
+                                                    <Button Classes="Basic" Padding="8,5" ToolTip.Tip="Open AWS console"
+                                                            IsVisible="{Binding IsActive}"
+                                                            Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).OpenConsoleCommand}"
+                                                            CommandParameter="{Binding}">
+                                                        <PathIcon Data="{StaticResource IconGlobe}" Width="14" Height="14" />
+                                                    </Button>
+                                                    <Button Classes="Basic" Padding="8,5" ToolTip.Tip="Copy…">
+                                                        <PathIcon Data="{StaticResource IconCopy}" Width="14" Height="14" />
+                                                        <Button.Flyout>
+                                                            <MenuFlyout>
+                                                                <MenuItem Header="Copy profile name"
+                                                                          Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).CopyProfileNameCommand}"
+                                                                          CommandParameter="{Binding}" />
+                                                                <MenuItem Header="Copy account id"
+                                                                          Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).CopyAccountIdCommand}"
+                                                                          CommandParameter="{Binding}" />
+                                                                <Separator />
+                                                                <MenuItem Header="Copy credentials (PowerShell)"
+                                                                          IsEnabled="{Binding IsActive}"
+                                                                          Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).CopyCredentialsPowerShellCommand}"
+                                                                          CommandParameter="{Binding}" />
+                                                                <MenuItem Header="Copy credentials (bash)"
+                                                                          IsEnabled="{Binding IsActive}"
+                                                                          Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).CopyCredentialsBashCommand}"
+                                                                          CommandParameter="{Binding}" />
+                                                                <MenuItem Header="Copy credentials (profile block)"
+                                                                          IsEnabled="{Binding IsActive}"
+                                                                          Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).CopyCredentialsProfileCommand}"
+                                                                          CommandParameter="{Binding}" />
+                                                            </MenuFlyout>
+                                                        </Button.Flyout>
+                                                    </Button>
+                                                    <Button Classes="Basic" Padding="8,5" ToolTip.Tip="Session options"
+                                                            Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).EditSessionCommand}"
+                                                            CommandParameter="{Binding}">
+                                                        <PathIcon Data="{StaticResource IconCog}" Width="14" Height="14" />
+                                                    </Button>
+                                                </StackPanel>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Grid>
+
+        <!-- Status bar -->
+        <suki:InfoBar Grid.Column="1" Grid.Row="1" Margin="16,4,16,8"
+                      IsOpen="{Binding StatusOpen, Mode=TwoWay}"
+                      IsClosable="True"
+                      Title="Status"
+                      Message="{Binding StatusMessage}"
+                      Severity="Information" />
+    </Grid>
+    </VisualLayerManager>
+</suki:SukiWindow>

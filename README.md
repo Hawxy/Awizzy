@@ -1,1 +1,1 @@
-# aws-profile-manager
+# Awizzy
