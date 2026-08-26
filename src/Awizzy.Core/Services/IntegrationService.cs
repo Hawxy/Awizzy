@@ -37,10 +37,12 @@ public class IntegrationService(
         await state.SaveAsync(ct);
     }
 
-    public async Task DeleteAsync(Guid integrationId, CancellationToken ct = default)
+    public async Task LogoutAsync(Guid integrationId, CancellationToken ct = default)
     {
         var integration = Get(integrationId);
 
+        // Logging out invalidates every session, so stop the running ones (removes their
+        // credentials from the file and the cache) and clear the account list.
         foreach (var session in state.Workspace.Sessions.Where(s => s.IntegrationId == integrationId).ToList())
         {
             if (session.State is SessionState.Active or SessionState.Refreshing or SessionState.Starting)
@@ -49,6 +51,14 @@ public class IntegrationService(
         }
 
         await authService.LogoutAsync(integration, ct);
+        await state.SaveAsync(ct);
+        logger.LogInformation("Logged out of {Alias}; sessions cleared.", integration.Alias);
+    }
+
+    public async Task DeleteAsync(Guid integrationId, CancellationToken ct = default)
+    {
+        var integration = Get(integrationId);
+        await LogoutAsync(integrationId, ct);
         state.Workspace.Integrations.Remove(integration);
         await state.SaveAsync(ct);
         logger.LogInformation("Integration {Alias} deleted.", integration.Alias);

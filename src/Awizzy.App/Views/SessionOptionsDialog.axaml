@@ -9,7 +9,6 @@
         CanFullScreen="False" CanPin="False"
         BackgroundStyle="Flat"
         WindowStartupLocation="CenterOwner">
-    <VisualLayerManager>
     <StackPanel Margin="20" Spacing="12">
         <TextBlock Text="{Binding SessionName}" FontWeight="SemiBold" />
         <StackPanel Spacing="4">
@@ -28,5 +27,4 @@
             <Button Content="Save" Classes="Flat" Click="OnSave" IsDefault="True" />
         </StackPanel>
     </StackPanel>
-    </VisualLayerManager>
 </suki:SukiWindow>

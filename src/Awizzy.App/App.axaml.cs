@@ -59,6 +59,7 @@ public class App : Application
                 services.AddAwizzyCore();
                 services.AddSingleton(paths);
                 services.AddSingleton<SukiUI.Dialogs.ISukiDialogManager, SukiUI.Dialogs.SukiDialogManager>();
+                services.AddSingleton<SukiUI.Toasts.ISukiToastManager, SukiUI.Toasts.SukiToastManager>();
                 services.AddSingleton<Services.IDialogService, Services.DialogService>();
                 services.AddSingleton<Services.IClipboardService, Services.ClipboardService>();
                 services.AddSingleton<Services.SessionActionsService>();

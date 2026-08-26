@@ -143,6 +143,25 @@ public class IntegrationServiceTests
     }
 
     [Test]
+    public async Task LogoutAsync_StopsSessionsClearsListAndDiscardsToken()
+    {
+        var integration = await CreateIntegration();
+        PortalReturns(
+            new AccountRole("111111111111", "prod", "Admin"),
+            new AccountRole("222222222222", "dev", "Admin"));
+        await _service.SyncSessionsAsync(integration.Id);
+        var active = _workspace.Sessions[0];
+        active.State = SessionState.Active;
+
+        await _service.LogoutAsync(integration.Id);
+
+        await _sessionManager.Received(1).StopSessionAsync(active.Id, Arg.Any<CancellationToken>());
+        await _auth.Received(1).LogoutAsync(integration, Arg.Any<CancellationToken>());
+        await Assert.That(_workspace.Sessions).IsEmpty();
+        await Assert.That(_workspace.Integrations).Contains(integration);
+    }
+
+    [Test]
     public async Task DeleteAsync_CascadesSessionsAndLogsOut()
     {
         var integration = await CreateIntegration();

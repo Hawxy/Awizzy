@@ -13,7 +13,11 @@ public interface IIntegrationService
     Task<SsoIntegration> CreateAsync(string alias, string portalUrl, string region, CancellationToken ct = default);
     Task UpdateAsync(Guid integrationId, string alias, string portalUrl, string region, CancellationToken ct = default);
 
-    /// <summary>Deletes the integration: stops its active sessions, removes its sessions, and discards its token.</summary>
+    /// <summary>Logs out of the integration: stops its active sessions (removing their credentials),
+    /// clears its account list, and discards its token.</summary>
+    Task LogoutAsync(Guid integrationId, CancellationToken ct = default);
+
+    /// <summary>Logs out (see <see cref="LogoutAsync"/>) and removes the integration itself.</summary>
     Task DeleteAsync(Guid integrationId, CancellationToken ct = default);
 
     /// <summary>Diffs the portal's account/role list against existing sessions. Existing sessions keep

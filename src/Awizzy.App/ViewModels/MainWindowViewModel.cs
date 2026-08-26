@@ -5,9 +5,11 @@ using Awizzy.Core.Abstractions;
 using Awizzy.Core.Models;
 using Awizzy.Core.Services;
 using Awizzy.Mcp;
+using Avalonia.Controls.Notifications;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SukiUI.Dialogs;
+using SukiUI.Toasts;
 
 namespace Awizzy.App.ViewModels;
 
@@ -26,7 +28,6 @@ public partial class MainWindowViewModel : ObservableObject
     private readonly IIntegrationService _integrationService;
     private readonly ISessionManager _sessionManager;
     private readonly IDialogService _dialogService;
-    private readonly ISsoOidcAuthService _authService;
     private readonly SessionActionsService _sessionActions;
     private readonly TimeProvider _time;
     private readonly IMcpServerHost _mcpHost;
@@ -42,20 +43,20 @@ public partial class MainWindowViewModel : ObservableObject
         IIntegrationService integrationService,
         ISessionManager sessionManager,
         IDialogService dialogService,
-        ISsoOidcAuthService authService,
         SessionActionsService sessionActions,
         TimeProvider time,
         IMcpServerHost mcpHost,
         McpChangeNotifier mcpNotifier,
-        ISukiDialogManager dialogManager)
+        ISukiDialogManager dialogManager,
+        ISukiToastManager toastManager)
     {
         DialogManager = dialogManager;
+        ToastManager = toastManager;
         _mcpHost = mcpHost;
         _state = state;
         _integrationService = integrationService;
         _sessionManager = sessionManager;
         _dialogService = dialogService;
-        _authService = authService;
         _sessionActions = sessionActions;
         _time = time;
 
@@ -109,6 +110,8 @@ public partial class MainWindowViewModel : ObservableObject
 
     public ISukiDialogManager DialogManager { get; }
 
+    public ISukiToastManager ToastManager { get; }
+
     public ObservableCollection<IntegrationItemViewModel> Integrations { get; } = [];
 
     /// <summary>Account headers and the session rows of expanded accounts, flattened into one
@@ -122,17 +125,6 @@ public partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private IntegrationItemViewModel? _selectedIntegration;
-
-    [ObservableProperty]
-    private string _statusMessage = string.Empty;
-
-    [ObservableProperty]
-    private bool _statusOpen;
-
-    [ObservableProperty]
-    private bool _isAnySyncing;
-
-    partial void OnStatusMessageChanged(string value) => StatusOpen = value.Length > 0;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(AccountHeader))]
@@ -150,7 +142,10 @@ public partial class MainWindowViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(StatusHeader))]
     private bool _sortAscending = true;
 
-    public bool HasNoSessions => _groups.Count == 0;
+    public bool HasNoSessions => _state.Workspace.Sessions.Count == 0;
+
+    /// <summary>Profiles exist but the current search or integration filter matches none.</summary>
+    public bool HasNoMatches => _groups.Count == 0 && !HasNoSessions;
 
     public bool IsMcpRunning => _mcpHost.IsRunning;
 
@@ -236,9 +231,10 @@ public partial class MainWindowViewModel : ObservableObject
     {
         await GuardAsync(async () =>
         {
-            await _authService.LogoutAsync(item.Integration);
+            await _integrationService.LogoutAsync(item.Id);
+            RebuildSessions();
             item.RaiseChanged();
-            StatusMessage = $"Logged out of {item.Alias}.";
+            ShowToast(item.Alias, "Logged out; sessions and credentials cleared.", NotificationType.Success);
         });
     }
 
@@ -246,21 +242,26 @@ public partial class MainWindowViewModel : ObservableObject
     private async Task SyncAsync(IntegrationItemViewModel item)
     {
         item.IsSyncing = true;
-        IsAnySyncing = true;
-        StatusMessage = $"Syncing {item.Alias}…";
+        var loadingToast = ToastManager.CreateToast()
+            .WithTitle(item.Alias)
+            .WithContent("Loading accounts and roles…")
+            .WithLoadingState(true)
+            .Queue();
         try
         {
             await GuardAsync(async () =>
             {
                 var result = await _integrationService.SyncSessionsAsync(item.Id);
                 RebuildSessions();
-                StatusMessage = $"{item.Alias}: {result.Total} roles ({result.Added} new, {result.Removed} removed).";
+                ShowToast(item.Alias,
+                    $"{result.Total} roles ({result.Added} new, {result.Removed} removed).",
+                    NotificationType.Success);
             });
         }
         finally
         {
+            ToastManager.Dismiss(loadingToast, SukiToastDismissSource.Code);
             item.IsSyncing = false;
-            IsAnySyncing = Integrations.Any(i => i.IsSyncing);
             item.RaiseChanged();
         }
     }
@@ -329,7 +330,7 @@ public partial class MainWindowViewModel : ObservableObject
             await _state.SaveAsync();
             ThemeApplier.Apply(result.Theme);
             RebuildSessions();
-            StatusMessage = "Settings saved.";
+            ShowToast("Settings", "Settings saved.", NotificationType.Success);
 
             if (result.McpServerEnabled)
             {
@@ -345,30 +346,30 @@ public partial class MainWindowViewModel : ObservableObject
 
     [RelayCommand]
     private Task CopyProfileNameAsync(SessionItemViewModel item) =>
-        RunSessionActionAsync(() => _sessionActions.CopyProfileNameAsync(item.Session));
+        RunSessionActionAsync(item, () => _sessionActions.CopyProfileNameAsync(item.Session));
 
     [RelayCommand]
     private Task CopyAccountIdAsync(SessionItemViewModel item) =>
-        RunSessionActionAsync(() => _sessionActions.CopyAccountIdAsync(item.Session));
+        RunSessionActionAsync(item, () => _sessionActions.CopyAccountIdAsync(item.Session));
 
     [RelayCommand]
     private Task CopyCredentialsPowerShellAsync(SessionItemViewModel item) =>
-        RunSessionActionAsync(() => _sessionActions.CopyCredentialsPowerShellAsync(item.Session));
+        RunSessionActionAsync(item, () => _sessionActions.CopyCredentialsPowerShellAsync(item.Session));
 
     [RelayCommand]
     private Task CopyCredentialsBashAsync(SessionItemViewModel item) =>
-        RunSessionActionAsync(() => _sessionActions.CopyCredentialsBashAsync(item.Session));
+        RunSessionActionAsync(item, () => _sessionActions.CopyCredentialsBashAsync(item.Session));
 
     [RelayCommand]
     private Task CopyCredentialsProfileAsync(SessionItemViewModel item) =>
-        RunSessionActionAsync(() => _sessionActions.CopyCredentialsProfileAsync(item.Session));
+        RunSessionActionAsync(item, () => _sessionActions.CopyCredentialsProfileAsync(item.Session));
 
     [RelayCommand]
     private Task OpenConsoleAsync(SessionItemViewModel item) =>
-        RunSessionActionAsync(() => _sessionActions.OpenConsoleAsync(item.Session));
+        RunSessionActionAsync(item, () => _sessionActions.OpenConsoleAsync(item.Session));
 
-    private Task RunSessionActionAsync(Func<Task<string>> action) =>
-        GuardAsync(async () => StatusMessage = await action());
+    private Task RunSessionActionAsync(SessionItemViewModel item, Func<Task<string>> action) =>
+        GuardAsync(async () => ShowToast(item.DisplayName, await action(), NotificationType.Information));
 
     [RelayCommand]
     private async Task EditSessionAsync(SessionItemViewModel item)
@@ -410,8 +411,21 @@ public partial class MainWindowViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            StatusMessage = ex.Message;
+            ShowToast("Error", ex.Message, NotificationType.Error);
         }
+    }
+
+    private void ShowToast(string title, string message, NotificationType type)
+    {
+        // Errors stay up longer; everything is click-dismissable.
+        var lifetime = type == NotificationType.Error ? TimeSpan.FromSeconds(8) : TimeSpan.FromSeconds(4);
+        ToastManager.CreateToast()
+            .WithTitle(title)
+            .WithContent(message)
+            .OfType(type)
+            .Dismiss().After(lifetime)
+            .Dismiss().ByClicking()
+            .Queue();
     }
 
     private IEnumerable<SessionItemViewModel> AllSessions() =>
@@ -481,6 +495,7 @@ public partial class MainWindowViewModel : ObservableObject
 
         PruneSessionItemCache();
         OnPropertyChanged(nameof(HasNoSessions));
+        OnPropertyChanged(nameof(HasNoMatches));
     }
 
     private void OnGroupPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)

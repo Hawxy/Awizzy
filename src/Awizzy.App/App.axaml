@@ -16,5 +16,11 @@
     </Application.Resources>
     <Application.Styles>
         <suki:SukiTheme ThemeColor="Blue" />
+        <!-- SukiUI's ComboBox template insets its visible body 5px on every side to reserve
+             room for the dropdown shadow, so it renders narrower than TextBox at the same
+             width. Cancel the horizontal inset so form fields line up. -->
+        <Style Selector="ComboBox">
+            <Setter Property="Margin" Value="-5,0" />
+        </Style>
     </Application.Styles>
 </Application>
