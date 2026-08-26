@@ -14,8 +14,13 @@ public class WebConsoleUrlService(HttpClient httpClient) : IWebConsoleUrlService
             new FederationSession(credentials.AccessKeyId, credentials.SecretAccessKey, credentials.SessionToken),
             CoreJsonContext.Default.FederationSession);
 
-        var tokenUrl = $"{FederationEndpoint}?Action=getSigninToken&Session={Uri.EscapeDataString(sessionJson)}";
-        using var response = await httpClient.GetAsync(tokenUrl, ct);
+        // POST keeps the secret credentials out of URLs, which proxies and HTTP diagnostics log.
+        using var content = new FormUrlEncodedContent(
+        [
+            new KeyValuePair<string, string>("Action", "getSigninToken"),
+            new KeyValuePair<string, string>("Session", sessionJson),
+        ]);
+        using var response = await httpClient.PostAsync(FederationEndpoint, content, ct);
         if (!response.IsSuccessStatusCode)
             throw new InvalidOperationException($"AWS federation endpoint returned {(int)response.StatusCode}; the session credentials may have expired.");
 

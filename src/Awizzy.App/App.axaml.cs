@@ -63,7 +63,7 @@ public class App : Application
                 services.AddSingleton<Services.IClipboardService, Services.ClipboardService>();
                 services.AddSingleton<Services.SessionActionsService>();
                 services.AddSingleton<Mcp.McpChangeNotifier>();
-                services.AddSingleton<Mcp.IMainThreadDispatcher, Services.AvaloniaMainThreadDispatcher>();
+                services.AddSingleton<Core.Abstractions.IMainThreadDispatcher, Services.AvaloniaMainThreadDispatcher>();
                 services.AddSingleton<Mcp.IMcpServerHost, Mcp.McpServerHost>();
                 services.AddSingleton<MainWindowViewModel>();
             })

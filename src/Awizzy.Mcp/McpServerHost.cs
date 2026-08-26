@@ -75,6 +75,20 @@ public class McpServerHost(
                 .WithTools<McpTools>(toolSerializerOptions);
 
             var app = builder.Build();
+
+            // Reject browser-based attacks that reach the loopback listener (DNS rebinding,
+            // cross-site requests); legitimate MCP clients connect to localhost directly.
+            app.Use(async (context, next) =>
+            {
+                if (!McpRequestGuard.IsAllowed(context.Request.Host.Host, context.Request.Headers.Origin))
+                {
+                    context.Response.StatusCode = 403;
+                    return;
+                }
+
+                await next();
+            });
+
             app.MapMcp();
 
             try

@@ -12,7 +12,17 @@ public partial class AddIntegrationDialog : SukiWindow
 
     private void OnSave(object? sender, RoutedEventArgs e)
     {
-        if (DataContext is AddIntegrationDialogViewModel viewModel)
-            Close(viewModel.ToInput());
+        if (DataContext is not AddIntegrationDialogViewModel viewModel)
+            return;
+
+        try
+        {
+            Close(viewModel.ToValidatedInput());
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+        {
+            ErrorText.Text = ex.Message;
+            ErrorText.IsVisible = true;
+        }
     }
 }

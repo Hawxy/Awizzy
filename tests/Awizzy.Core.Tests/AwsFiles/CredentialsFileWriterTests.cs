@@ -84,6 +84,29 @@ public class CredentialsFileWriterTests
     }
 
     [Test]
+    public async Task WriteProfileAsync_RefusesToOverwriteForeignProfile()
+    {
+        _fs.AddFile(CredentialsPath, new MockFileData(
+            "[work]\naws_access_key_id = AKIAFOREIGN\naws_secret_access_key = foreignsecret\n"));
+
+        await Assert.That(async () => { await _writer.WriteProfileAsync("work", Credentials, "us-east-1"); })
+            .Throws<InvalidOperationException>()
+            .WithMessageContaining("not written by Awizzy");
+
+        var content = _fs.File.ReadAllText(CredentialsPath);
+        await Assert.That(content).Contains("AKIAFOREIGN");
+        await Assert.That(content).DoesNotContain("AKIATEST");
+    }
+
+    [Test]
+    public async Task WriteProfileAsync_LeavesNoTempFileBehind()
+    {
+        await _writer.WriteProfileAsync("default", Credentials, "eu-west-1");
+
+        await Assert.That(_fs.AllFiles.Count(f => f.Contains("tmp", StringComparison.OrdinalIgnoreCase))).IsEqualTo(0);
+    }
+
+    [Test]
     public async Task RemoveProfileAsync_RemovesManagedProfile()
     {
         await _writer.WriteProfileAsync("default", Credentials, "eu-west-1");

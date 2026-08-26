@@ -12,6 +12,9 @@ public class IntegrationService(
     TimeProvider time,
     ILogger<IntegrationService> logger) : IIntegrationService
 {
+    public void ValidateInput(string alias, string portalUrl, string region, Guid? excludeId = null) =>
+        Validate(alias, portalUrl, region, excludeId);
+
     public async Task<SsoIntegration> CreateAsync(string alias, string portalUrl, string region, CancellationToken ct = default)
     {
         var integration = new SsoIntegration

@@ -1,6 +1,7 @@
 using Awizzy.Core.Abstractions;
 using Awizzy.Core.Models;
 using Awizzy.Core.Services;
+using Awizzy.Core.Tests.TestDoubles;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
@@ -30,7 +31,7 @@ public class CredentialRefreshServiceTests
         var repository = Substitute.For<IWorkspaceRepository>();
         repository.Load().Returns(_workspace);
         _service = new CredentialRefreshService(
-            new WorkspaceState(repository), _sessionManager, _time,
+            new WorkspaceState(repository), _sessionManager, new ImmediateMainThreadDispatcher(), _time,
             NullLogger<CredentialRefreshService>.Instance);
     }
 

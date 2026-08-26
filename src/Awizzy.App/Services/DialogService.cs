@@ -18,12 +18,15 @@ public class DialogService(IServiceProvider services) : IDialogService
 
     public async Task<IntegrationInput?> ShowAddIntegrationAsync(SsoIntegration? existing = null)
     {
+        var integrationService = services.GetRequiredService<IIntegrationService>();
         var viewModel = new AddIntegrationDialogViewModel
         {
             Title = existing is null ? "Add integration" : "Edit integration",
             Alias = existing?.Alias ?? string.Empty,
             PortalUrl = existing?.PortalUrl ?? string.Empty,
             Region = existing?.Region ?? "us-east-1",
+            Validator = input => integrationService.ValidateInput(
+                input.Alias, input.PortalUrl, input.Region, existing?.Id),
         };
         var dialog = new AddIntegrationDialog { DataContext = viewModel };
         return await dialog.ShowDialog<IntegrationInput?>(Owner);

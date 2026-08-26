@@ -19,6 +19,13 @@ public class CredentialsFileWriter(
     public Task WriteProfileAsync(string profileName, RoleCredentialSet credentials, string? region, CancellationToken ct = default) =>
         MutateAsync(ini =>
         {
+            // Never overwrite a section this app does not own; the user's hand-written
+            // keys would be unrecoverable.
+            if (ini.HasSection(profileName) && !ini.SectionHasMarker(profileName, Marker))
+                throw new InvalidOperationException(
+                    $"The credentials file already has a profile [{profileName}] that was not written by Awizzy. "
+                    + "Rename this session's profile, or remove that section from the file yourself.");
+
             var values = new List<KeyValuePair<string, string>>
             {
                 new("aws_access_key_id", credentials.AccessKeyId),
@@ -79,6 +86,10 @@ public class CredentialsFileWriter(
         var directory = fs.Path.GetDirectoryName(path);
         if (directory is { Length: > 0 })
             fs.Directory.CreateDirectory(directory);
-        fs.File.WriteAllText(path, updated);
+
+        // Atomic-ish replace: a crash mid-write must not corrupt the user's credentials file.
+        var temp = path + ".awizzy-tmp";
+        fs.File.WriteAllText(temp, updated);
+        fs.File.Move(temp, path, overwrite: true);
     }
 }

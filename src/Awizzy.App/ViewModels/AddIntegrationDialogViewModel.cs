@@ -20,5 +20,13 @@ public partial class AddIntegrationDialogViewModel : ObservableObject
 
     public string Title { get; init; } = "Add integration";
 
-    public IntegrationInput ToInput() => new(Alias, PortalUrl, Region);
+    /// <summary>Throws when the input is invalid; keeps the dialog open so nothing typed is lost.</summary>
+    public required Action<IntegrationInput> Validator { get; init; }
+
+    public IntegrationInput ToValidatedInput()
+    {
+        var input = new IntegrationInput(Alias, PortalUrl, Region);
+        Validator(input);
+        return input;
+    }
 }
