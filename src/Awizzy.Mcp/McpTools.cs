@@ -173,7 +173,7 @@ public class McpTools(
         s.State.ToString(), s.CredentialsExpireAt, s.ErrorMessage, IsControlDisabled(s));
 
     private bool IsControlDisabled(AwsSession session) =>
-        state.Workspace.Settings.McpExcludedRoles.Contains(session.McpRoleKey, StringComparer.OrdinalIgnoreCase);
+        state.Workspace.Settings.McpExcludedRoles.Contains(session.RoleKey, StringComparer.OrdinalIgnoreCase);
 
     private void EnsureControllable(AwsSession session)
     {

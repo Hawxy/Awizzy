@@ -63,13 +63,9 @@ public partial class MainWindowViewModel : ObservableObject
         _sessionActions = sessionActions;
         _time = time;
 
-        _sessionManager.SessionChanged += (_, e) =>
-            Dispatcher.UIThread.Post(() =>
-            {
-                if (_sessionItemCache.TryGetValue(e.Session.Id, out var item))
-                    item.RaiseChanged();
-                _groups.FirstOrDefault(g => g.AccountId == e.Session.AccountId)?.RaiseChanged();
-            });
+        // A full rebuild (diff-based, so cheap) keeps active sessions promoted to the top
+        // as their state changes, besides refreshing the row's own bindings.
+        _sessionManager.SessionChanged += (_, _) => Dispatcher.UIThread.Post(RebuildSessions);
 
         _mcpHost.StatusChanged += (_, _) =>
             Dispatcher.UIThread.Post(() =>
@@ -92,7 +88,7 @@ public partial class MainWindowViewModel : ObservableObject
             DispatcherPriority.Background,
             (_, _) =>
             {
-                foreach (var session in AllSessions().Where(s => s.IsActive))
+                foreach (var session in ActiveSessions)
                     session.RaiseChanged();
                 // Keeps relative sync-age text and token-expiry-driven state fresh.
                 foreach (var integration in Integrations)
@@ -121,10 +117,19 @@ public partial class MainWindowViewModel : ObservableObject
     /// list so a single virtualizing ItemsControl can render the table.</summary>
     public ObservableCollection<object> Rows { get; } = [];
 
+    /// <summary>Running sessions, shown in the pinned box above the table instead of
+    /// under their account groups.</summary>
+    public ObservableCollection<SessionItemViewModel> ActiveSessions { get; } = [];
+
+    public bool HasActiveSessions => ActiveSessions.Count > 0;
+
     private readonly List<AccountGroupViewModel> _groups = [];
 
     [ObservableProperty]
     private string _searchText = string.Empty;
+
+    [ObservableProperty]
+    private bool _showFavoritesOnly;
 
     [ObservableProperty]
     private IntegrationItemViewModel? _selectedIntegration;
@@ -147,8 +152,9 @@ public partial class MainWindowViewModel : ObservableObject
 
     public bool HasNoSessions => _state.Workspace.Sessions.Count == 0;
 
-    /// <summary>Profiles exist but the current search or integration filter matches none.</summary>
-    public bool HasNoMatches => _groups.Count == 0 && !HasNoSessions;
+    /// <summary>Startable profiles exist but the current search or filters match none.
+    /// Running sessions don't count; they render in the pinned box regardless.</summary>
+    public bool HasNoMatches => _groups.Count == 0 && _state.Workspace.Sessions.Any(s => !IsRunning(s));
 
     public bool IsMcpRunning => _mcpHost.IsRunning;
 
@@ -172,6 +178,8 @@ public partial class MainWindowViewModel : ObservableObject
     }
 
     partial void OnSelectedIntegrationChanged(IntegrationItemViewModel? value) => RebuildSessions();
+
+    partial void OnShowFavoritesOnlyChanged(bool value) => RebuildSessions();
 
     [RelayCommand]
     private void ToggleSort(SessionSortColumn column)
@@ -289,17 +297,34 @@ public partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private async Task StartSessionAsync(SessionItemViewModel item)
     {
+        // State transitions raise SessionChanged, which rebuilds the views.
         await GuardAsync(() => _sessionManager.StartSessionAsync(item.Id));
-        foreach (var session in AllSessions())
-            session.RaiseChanged();
-        foreach (var group in _groups)
-            group.RaiseChanged();
     }
 
     [RelayCommand]
     private async Task StopSessionAsync(SessionItemViewModel item)
     {
         await GuardAsync(() => _sessionManager.StopSessionAsync(item.Id));
+    }
+
+    [RelayCommand]
+    private async Task ToggleFavoriteAsync(SessionItemViewModel item)
+    {
+        await GuardAsync(async () =>
+        {
+            var favorites = _state.Workspace.Settings.FavoriteRoles;
+            var removed = favorites.RemoveAll(key =>
+                string.Equals(key, item.Session.RoleKey, StringComparison.OrdinalIgnoreCase));
+            if (removed == 0)
+                favorites.Add(item.Session.RoleKey);
+            await _state.SaveAsync();
+
+            // Unfavoriting under the favorites filter removes the row.
+            if (ShowFavoritesOnly)
+                RebuildSessions();
+            else
+                item.RaiseChanged();
+        });
     }
 
     [RelayCommand]
@@ -454,9 +479,6 @@ public partial class MainWindowViewModel : ObservableObject
             .Queue();
     }
 
-    private IEnumerable<SessionItemViewModel> AllSessions() =>
-        _groups.SelectMany(g => g.Sessions);
-
     private void RebuildIntegrations()
     {
         var selectedId = SelectedIntegration?.Id;
@@ -471,9 +493,28 @@ public partial class MainWindowViewModel : ObservableObject
         // A direct rebuild supersedes any rebuild the search debounce still has pending.
         _searchDebounceTimer.Stop();
 
+        // The pinned box shows every running session regardless of the filters, so it
+        // stays in view however the table below is narrowed.
+        SyncCollection(ActiveSessions, _state.Workspace.Sessions
+            .Where(IsRunning)
+            .OrderBy(s => s.AccountName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(s => s.RoleName, StringComparer.OrdinalIgnoreCase)
+            .Select(GetOrCreateSessionItem)
+            .ToList());
+
         var query = _state.Workspace.Sessions.AsEnumerable();
         if (SelectedIntegration is { } selected)
             query = query.Where(s => s.IntegrationId == selected.Id);
+
+        // Group summaries count the account's full inventory, including the running
+        // sessions that render in the pinned box instead of under the group.
+        var accountCounts = query
+            .GroupBy(s => s.AccountId)
+            .ToDictionary(g => g.Key, g => (Total: g.Count(), Active: g.Count(IsRunning)));
+
+        query = query.Where(s => !IsRunning(s));
+        if (ShowFavoritesOnly)
+            query = query.Where(IsFavorite);
         if (SearchText is { Length: > 0 } search)
         {
             query = query.Where(s =>
@@ -505,6 +546,9 @@ public partial class MainWindowViewModel : ObservableObject
                 group.PropertyChanged += OnGroupPropertyChanged;
             }
 
+            var counts = accountCounts[g.Key.AccountId];
+            group.TotalRoles = counts.Total;
+            group.ActiveCount = counts.Active;
             SyncCollection(group.Sessions, SortSessions(g).Select(GetOrCreateSessionItem).ToList());
             _groups.Add(group);
         }
@@ -519,9 +563,13 @@ public partial class MainWindowViewModel : ObservableObject
                 session.RaiseChanged();
         }
 
+        foreach (var session in ActiveSessions)
+            session.RaiseChanged();
+
         PruneSessionItemCache();
         OnPropertyChanged(nameof(HasNoSessions));
         OnPropertyChanged(nameof(HasNoMatches));
+        OnPropertyChanged(nameof(HasActiveSessions));
     }
 
     private void OnGroupPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -547,9 +595,15 @@ public partial class MainWindowViewModel : ObservableObject
     private SessionItemViewModel GetOrCreateSessionItem(AwsSession session)
     {
         if (!_sessionItemCache.TryGetValue(session.Id, out var item))
-            _sessionItemCache[session.Id] = item = new SessionItemViewModel(session, _time);
+            _sessionItemCache[session.Id] = item = new SessionItemViewModel(session, _time, IsFavorite);
         return item;
     }
+
+    private bool IsFavorite(AwsSession session) =>
+        _state.Workspace.Settings.FavoriteRoles.Contains(session.RoleKey, StringComparer.OrdinalIgnoreCase);
+
+    private static bool IsRunning(AwsSession session) =>
+        session.State is SessionState.Active or SessionState.Refreshing or SessionState.Starting;
 
     private void PruneSessionItemCache()
     {

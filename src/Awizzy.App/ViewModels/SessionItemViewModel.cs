@@ -3,19 +3,30 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Awizzy.App.ViewModels;
 
-public class SessionItemViewModel(AwsSession session, TimeProvider time) : ObservableObject
+public class SessionItemViewModel(AwsSession session, TimeProvider time, Func<AwsSession, bool> isFavorite)
+    : ObservableObject
 {
     public AwsSession Session { get; } = session;
 
     public Guid Id => Session.Id;
     public string DisplayName => Session.DisplayName;
     public string AccountId => Session.AccountId;
+    public string AccountName => Session.AccountName;
     public string RoleName => Session.RoleName;
+
+    /// <summary>Shown under the role for rows in the pinned active box, which have no
+    /// account group header above them.</summary>
+    public string AccountText => $"{AccountName} · {AccountId}";
     public string Region => Session.Region;
     public string ProfileName => Session.ProfileName;
 
+    public bool IsFavorite => isFavorite(Session);
+
     public SessionState State => Session.State;
     public bool IsActive => State is SessionState.Active or SessionState.Refreshing;
+
+    /// <summary>Mirrors the predicate that routes a session into the pinned active box.</summary>
+    public bool IsRunning => State is SessionState.Active or SessionState.Refreshing or SessionState.Starting;
     public bool IsBusy => State is SessionState.Starting or SessionState.Refreshing;
     public bool HasError => State is SessionState.Error;
     public string? ErrorMessage => Session.ErrorMessage;

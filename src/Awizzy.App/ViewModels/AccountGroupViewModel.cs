@@ -13,13 +13,17 @@ public partial class AccountGroupViewModel(string accountName, string accountId)
     [ObservableProperty]
     private bool _isExpanded = true;
 
-    public int ActiveCount => Sessions.Count(s => s.IsActive);
+    /// <summary>Account-wide counts, set during rebuild. Not derived from Sessions:
+    /// running sessions render in the pinned box, not under the group.</summary>
+    public int TotalRoles { get; set; }
+
+    public int ActiveCount { get; set; }
 
     public string SummaryText
     {
         get
         {
-            var roles = Sessions.Count == 1 ? "1 role" : $"{Sessions.Count} roles";
+            var roles = TotalRoles == 1 ? "1 role" : $"{TotalRoles} roles";
             return ActiveCount > 0 ? $"{roles} · {ActiveCount} active" : roles;
         }
     }

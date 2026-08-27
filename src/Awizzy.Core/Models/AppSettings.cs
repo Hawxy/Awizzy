@@ -19,4 +19,7 @@ public class AppSettings
     /// <summary>Sessions (as AccountId/RoleName keys) excluded from MCP control: still listed,
     /// but MCP tools refuse to start or stop them or issue console URLs.</summary>
     public List<string> McpExcludedRoles { get; set; } = [];
+
+    /// <summary>Sessions (as AccountId/RoleName keys) the user starred in the session table.</summary>
+    public List<string> FavoriteRoles { get; set; } = [];
 }
