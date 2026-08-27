@@ -63,6 +63,19 @@
             <Setter Property="FontSize" Value="12" />
             <Setter Property="HorizontalAlignment" Value="Left" />
         </Style>
+        <!-- Fades the pinned active box in when the first session starts. -->
+        <Style Selector="Border#ActiveBox.shown">
+            <Style.Animations>
+                <Animation Duration="0:0:0.25" Easing="CubicEaseOut">
+                    <KeyFrame Cue="0%">
+                        <Setter Property="Opacity" Value="0" />
+                    </KeyFrame>
+                    <KeyFrame Cue="100%">
+                        <Setter Property="Opacity" Value="1" />
+                    </KeyFrame>
+                </Animation>
+            </Style.Animations>
+        </Style>
     </suki:SukiWindow.Styles>
     <!-- Shared by the session table and the pinned active-sessions box. -->
     <suki:SukiWindow.DataTemplates>
@@ -338,7 +351,10 @@
 
             <!-- Pinned box: running sessions live here, outside the scrolling table,
                  so they stay in view however far the list below is scrolled. -->
-            <Border Grid.Row="2" IsVisible="{Binding HasActiveSessions}" Margin="0,0,0,8"
+            <!-- The entrance animation is keyed to a class because an IsVisible
+                 change alone does not re-run style animations. -->
+            <Border Grid.Row="2" x:Name="ActiveBox" IsVisible="{Binding HasActiveSessions}"
+                    Classes.shown="{Binding HasActiveSessions}" Margin="0,0,0,8"
                     BorderBrush="{DynamicResource SukiPrimaryColor}" BorderThickness="1"
                     Background="{DynamicResource ActiveBoxTintBrush}" CornerRadius="8"
                     Padding="0,2,0,4">
@@ -346,7 +362,30 @@
                     <TextBlock Text="Active sessions" FontSize="11" FontWeight="SemiBold"
                                Opacity="0.7" Margin="10,4,0,0" />
                     <ScrollViewer MaxHeight="200">
-                        <ItemsControl ItemsSource="{Binding ActiveSessions}" />
+                        <ItemsControl ItemsSource="{Binding ActiveSessions}">
+                            <ItemsControl.Styles>
+                                <!-- New rows slide up from the table below. Scoped here so
+                                     the shared row template never animates during the main
+                                     table's virtualized scrolling. The child combinator is
+                                     logical-tree: it matches the item containers (logical
+                                     children of the ItemsControl), not the presenters
+                                     inside the row's button templates. -->
+                                <Style Selector="ItemsControl > ContentPresenter">
+                                    <Style.Animations>
+                                        <Animation Duration="0:0:0.3" Easing="CubicEaseOut">
+                                            <KeyFrame Cue="0%">
+                                                <Setter Property="Opacity" Value="0" />
+                                                <Setter Property="TranslateTransform.Y" Value="16" />
+                                            </KeyFrame>
+                                            <KeyFrame Cue="100%">
+                                                <Setter Property="Opacity" Value="1" />
+                                                <Setter Property="TranslateTransform.Y" Value="0" />
+                                            </KeyFrame>
+                                        </Animation>
+                                    </Style.Animations>
+                                </Style>
+                            </ItemsControl.Styles>
+                        </ItemsControl>
                     </ScrollViewer>
                 </StackPanel>
             </Border>

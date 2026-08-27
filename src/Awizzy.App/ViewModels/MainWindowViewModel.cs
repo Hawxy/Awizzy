@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using Avalonia.Threading;
 using Awizzy.App.Services;
 using Awizzy.Core.Abstractions;
+using Awizzy.Core.Exceptions;
 using Awizzy.Core.Models;
 using Awizzy.Core.Services;
 using Awizzy.Mcp;
@@ -309,7 +310,30 @@ public partial class MainWindowViewModel : ObservableObject
     private async Task StartSessionAsync(SessionItemViewModel item)
     {
         // State transitions raise SessionChanged, which rebuilds the views.
-        await GuardAsync(() => _sessionManager.StartSessionAsync(item.Id));
+        try
+        {
+            await _sessionManager.StartSessionAsync(item.Id);
+        }
+        catch (SsoSessionExpiredException)
+        {
+            // A missing or expired SSO login is recoverable: run the login flow,
+            // then retry the start.
+            var integration = _state.Workspace.Integrations
+                .FirstOrDefault(i => i.Id == item.Session.IntegrationId);
+            if (integration is null)
+                return;
+
+            var success = await _dialogService.ShowLoginAsync(integration);
+            Integrations.FirstOrDefault(i => i.Id == integration.Id)?.RaiseChanged();
+            if (!success)
+                return;
+
+            await GuardAsync(() => _sessionManager.StartSessionAsync(item.Id));
+        }
+        catch (Exception ex)
+        {
+            ShowToast("Error", ex.Message, NotificationType.Error);
+        }
     }
 
     [RelayCommand]
