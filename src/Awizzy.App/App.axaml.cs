@@ -41,6 +41,9 @@ public class App : Application
             ? new AppPaths(Path.Combine(Path.GetTempPath(), "AwizzyDemo"))
             : new AppPaths();
 
+        // The file logger's RootPath requires an existing directory; a fresh install
+        // has none and the host build crashes without it.
+        Directory.CreateDirectory(paths.LogDirectory);
         CleanupOldLogs(paths.LogDirectory);
 
         _host = Host.CreateDefaultBuilder()
@@ -153,6 +156,9 @@ public class App : Application
 
     private void OnShutdownRequested(object? sender, ShutdownRequestedEventArgs e)
     {
+        // On macOS Cmd+Q requests shutdown directly; without this the window Closing
+        // handler would cancel it into a hide instead.
+        IsExiting = true;
         _trayIcon?.Dispose();
         _trayIcon = null;
         (_host?.Services.GetService<Mcp.IMcpServerHost>() as IDisposable)?.Dispose();

@@ -7,7 +7,11 @@ on:
 
 jobs:
   build-and-test:
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
 
@@ -28,7 +32,15 @@ jobs:
   # release tag hits them. Skipped on PRs to keep feedback fast.
   publish-smoke:
     if: github.event_name == 'push'
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+          - os: macos-latest
+            rid: osx-arm64
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
 
@@ -37,4 +49,30 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: Publish (Native AOT)
-        run: dotnet publish src/Awizzy.App -c Release -r win-x64 -o publish
+        run: dotnet publish src/Awizzy.App -c Release -r ${{ matrix.rid }} -o publish
+
+      # Best-effort runtime check: macOS runners have a real UI session, so this is the
+      # closest thing to hands-on macOS verification available without a Mac.
+      - name: GUI smoke (macOS)
+        if: runner.os == 'macOS'
+        continue-on-error: true
+        run: |
+          ./publish/Awizzy.App --demo &
+          APP_PID=$!
+          sleep 12
+          screencapture -x smoke.png
+          kill $APP_PID || true
+          mkdir -p smoke-logs
+          cp -r "$TMPDIR/AwizzyDemo/logs/." smoke-logs/ 2>/dev/null || true
+          cp "$HOME/Library/Application Support/Awizzy/logs/crash.log" smoke-logs/ 2>/dev/null || true
+
+      - name: Upload smoke artifacts (macOS)
+        if: runner.os == 'macOS'
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-smoke
+          path: |
+            smoke.png
+            smoke-logs/
+          if-no-files-found: ignore

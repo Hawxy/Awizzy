@@ -35,10 +35,10 @@ public class SessionActionsService(
         var c = GetCredentialsOrThrow(session);
         return CopyAsync(
             $"""
-             export AWS_ACCESS_KEY_ID={c.AccessKeyId}
-             export AWS_SECRET_ACCESS_KEY={c.SecretAccessKey}
-             export AWS_SESSION_TOKEN={c.SessionToken}
-             export AWS_DEFAULT_REGION={session.Region}
+             export AWS_ACCESS_KEY_ID='{c.AccessKeyId}'
+             export AWS_SECRET_ACCESS_KEY='{c.SecretAccessKey}'
+             export AWS_SESSION_TOKEN='{c.SessionToken}'
+             export AWS_DEFAULT_REGION='{session.Region}'
              """,
             "credentials (bash)");
     }

@@ -33,8 +33,18 @@ public class FileSecureStore(IFileSystem fs, IDataCipher cipher, AppPaths paths)
     public Task SetAsync(string key, string value, CancellationToken ct = default)
     {
         fs.Directory.CreateDirectory(paths.SecureDirectory);
+        var path = PathFor(key);
         var ciphertext = cipher.Protect(Encoding.UTF8.GetBytes(value));
-        fs.File.WriteAllBytes(PathFor(key), ciphertext);
+        fs.File.WriteAllBytes(path, ciphertext);
+
+        // Windows relies on the profile directory's ACL; Unix needs explicit user-only modes.
+        if (!OperatingSystem.IsWindows())
+        {
+            fs.File.SetUnixFileMode(paths.SecureDirectory,
+                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            fs.File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
+
         return Task.CompletedTask;
     }
 

@@ -3,14 +3,16 @@ using Awizzy.Core.Abstractions;
 using Awizzy.Core.AwsFiles;
 using Awizzy.Core.Models;
 using Awizzy.Core.Services;
+using Awizzy.Core.Tests.TestDoubles;
 using Microsoft.Extensions.Time.Testing;
 using NSubstitute;
+using TUnit.Core.Enums;
 
 namespace Awizzy.Core.Tests.AwsFiles;
 
 public class CredentialsFileWriterTests
 {
-    private static readonly string CredentialsPath = @"C:\Users\test\.aws\credentials";
+    private static readonly string CredentialsPath = TestPaths.Root("Users/test/.aws/credentials");
 
     private static readonly RoleCredentialSet Credentials = new(
         "AKIATEST",
@@ -136,5 +138,16 @@ public class CredentialsFileWriterTests
         await _writer.RemoveProfileAsync("default");
 
         await Assert.That(_fs.File.Exists(CredentialsPath)).IsFalse();
+    }
+
+    [Test]
+    [ExcludeOn(OS.Windows)]
+    [System.Runtime.Versioning.UnsupportedOSPlatform("windows")]
+    public async Task WriteProfileAsync_KeepsCredentialsFileUserOnly()
+    {
+        await _writer.WriteProfileAsync("acme", Credentials, "eu-west-1");
+
+        await Assert.That(_fs.File.GetUnixFileMode(CredentialsPath))
+            .IsEqualTo(UnixFileMode.UserRead | UnixFileMode.UserWrite);
     }
 }

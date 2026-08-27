@@ -31,27 +31,13 @@ internal static class Program
         // One instance per mode (demo and real may coexist); a second launch
         // signals the first to bring its window to the front, then exits.
         var suffix = args.Contains("--demo") ? "-demo" : string.Empty;
-        using var instanceMutex = new Mutex(
-            initiallyOwned: true, @"Local\Awizzy" + suffix, out var isFirstInstance);
-        using var activateSignal = new EventWaitHandle(
-            false, EventResetMode.AutoReset, @"Local\Awizzy-activate" + suffix);
-
-        if (!isFirstInstance)
+        using var instanceClaim = SingleInstance.TryClaim(suffix, () =>
         {
-            activateSignal.Set();
+            if (Application.Current is not null)
+                Avalonia.Threading.Dispatcher.UIThread.Post(App.ActivateMainWindow);
+        });
+        if (instanceClaim is null)
             return;
-        }
-
-        var listener = new Thread(() =>
-        {
-            while (activateSignal.WaitOne())
-            {
-                if (Application.Current is not null)
-                    Avalonia.Threading.Dispatcher.UIThread.Post(App.ActivateMainWindow);
-            }
-        })
-        { IsBackground = true };
-        listener.Start();
 
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
     }
@@ -61,8 +47,12 @@ internal static class Program
     {
         try
         {
-            var dir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Awizzy", "logs");
+            // Mirrors AppPaths' default root without its migration side effects.
+            var root = OperatingSystem.IsMacOS()
+                ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                    "Library", "Application Support", "Awizzy")
+                : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Awizzy");
+            var dir = Path.Combine(root, "logs");
             Directory.CreateDirectory(dir);
             var version = typeof(Program).Assembly.GetName().Version?.ToString() ?? "unknown";
             File.AppendAllText(

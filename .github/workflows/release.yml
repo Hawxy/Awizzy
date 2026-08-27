@@ -1,6 +1,7 @@
-# Tag a commit vX.Y.Z and push the tag; this publishes the app with Native AOT,
-# wraps it in a Velopack package (installer + delta updates), and creates the
-# GitHub release the in-app updater (UpdateService) reads.
+# Tag a commit vX.Y.Z and push the tag; each job publishes the app with Native AOT for
+# its OS, wraps it in a Velopack package (installer + delta updates), and uploads it to
+# the GitHub release the in-app updater (UpdateService) reads. The channels (win / osx)
+# keep the two platforms' update feeds separate within one release.
 name: Release
 
 on:
@@ -11,7 +12,7 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
@@ -32,17 +33,68 @@ jobs:
         run: dotnet tool install -g vpk --version 1.2.0
 
       - name: Download previous release assets (enables delta packages)
-        run: vpk download github --repoUrl ${{ github.server_url }}/${{ github.repository }} --token ${{ secrets.GITHUB_TOKEN }}
+        run: >-
+          vpk download github --repoUrl ${{ github.server_url }}/${{ github.repository }}
+          --token ${{ secrets.GITHUB_TOKEN }} --channel win
         continue-on-error: true # the first release has nothing to download
 
       - name: Pack
         run: >-
           vpk pack --packId Awizzy --packVersion ${{ env.VERSION }} --packDir publish
           --mainExe Awizzy.App.exe --packTitle Awizzy --packAuthors Hawxy
-          --icon src/Awizzy.App/Assets/app-icon.ico
+          --channel win --icon src/Awizzy.App/Assets/app-icon.ico
 
       - name: Upload to GitHub release
         run: >-
           vpk upload github --repoUrl ${{ github.server_url }}/${{ github.repository }}
           --token ${{ secrets.GITHUB_TOKEN }} --publish
-          --releaseName "Awizzy ${{ env.VERSION }}" --tag ${{ github.ref_name }}
+          --releaseName "Awizzy ${{ env.VERSION }}" --tag ${{ github.ref_name }} --channel win
+
+  # Runs after the windows job so both uploads target the release it created.
+  macos:
+    needs: windows
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Derive version from tag
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Publish (Native AOT)
+        run: dotnet publish src/Awizzy.App -c Release -r osx-arm64 -o publish -p:Version=${{ env.VERSION }}
+
+      - name: Build .icns from the png icon
+        run: |
+          mkdir icon.iconset
+          for size in 16 32 128 256; do
+            sips -z $size $size src/Awizzy.App/Assets/app-icon.png --out "icon.iconset/icon_${size}x${size}.png" >/dev/null
+          done
+          sips -z 32 32 src/Awizzy.App/Assets/app-icon.png --out icon.iconset/icon_16x16@2x.png >/dev/null
+          sips -z 64 64 src/Awizzy.App/Assets/app-icon.png --out icon.iconset/icon_32x32@2x.png >/dev/null
+          sips -z 256 256 src/Awizzy.App/Assets/app-icon.png --out icon.iconset/icon_128x128@2x.png >/dev/null
+          iconutil -c icns icon.iconset -o app-icon.icns
+
+      - name: Install vpk
+        run: dotnet tool install -g vpk --version 1.2.0
+
+      - name: Download previous release assets (enables delta packages)
+        run: >-
+          vpk download github --repoUrl ${{ github.server_url }}/${{ github.repository }}
+          --token ${{ secrets.GITHUB_TOKEN }} --channel osx
+        continue-on-error: true # the first release has nothing to download
+
+      - name: Pack
+        run: >-
+          vpk pack --packId Awizzy --packVersion ${{ env.VERSION }} --packDir publish
+          --mainExe Awizzy.App --packTitle Awizzy --packAuthors Hawxy
+          --channel osx --icon app-icon.icns
+
+      - name: Upload to GitHub release
+        run: >-
+          vpk upload github --repoUrl ${{ github.server_url }}/${{ github.repository }}
+          --token ${{ secrets.GITHUB_TOKEN }} --publish
+          --releaseName "Awizzy ${{ env.VERSION }}" --tag ${{ github.ref_name }} --channel osx

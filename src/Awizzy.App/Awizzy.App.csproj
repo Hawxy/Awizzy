@@ -3,13 +3,17 @@
     <OutputType>WinExe</OutputType>
     <!-- Release builds get the real version from the tag via -p:Version in CI. -->
     <Version>0.1.0</Version>
-    <ApplicationManifest>app.manifest</ApplicationManifest>
-    <ApplicationIcon>Assets\app-icon.ico</ApplicationIcon>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <PublishAot>true</PublishAot>
     <!-- Rolled-up trim/AOT warnings from third-party assemblies (Avalonia DataGrid);
          our own projects are analyzed via IsAotCompatible and build warning-free. -->
     <NoWarn>$(NoWarn);IL2104;IL3053</NoWarn>
+  </PropertyGroup>
+  <!-- Win32-only artifacts. Conditioned on the build host, which matches the target OS
+       because Native AOT cannot cross-compile between operating systems. -->
+  <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\app-icon.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <AvaloniaResource Include="Assets\**" />

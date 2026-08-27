@@ -9,7 +9,7 @@ namespace Awizzy.Core.Tests.Persistence;
 
 public class WorkspaceRepositoryTests
 {
-    private static readonly AppPaths Paths = new(@"C:\appdata\Awizzy");
+    private static readonly AppPaths Paths = new(TestPaths.Root("appdata/Awizzy"));
 
     private static WorkspaceRepository CreateRepository(MockFileSystem fs) =>
         new(fs, new FakeDataCipher(), Paths, new FakeTimeProvider(), NullLogger<WorkspaceRepository>.Instance);

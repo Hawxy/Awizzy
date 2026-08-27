@@ -90,6 +90,12 @@ public class CredentialsFileWriter(
         // Atomic-ish replace: a crash mid-write must not corrupt the user's credentials file.
         var temp = path + ".awizzy-tmp";
         fs.File.WriteAllText(temp, updated);
+
+        // The AWS CLI keeps this file at 0600; the temp file's mode survives the move,
+        // so set it there to avoid widening the real file on every write.
+        if (!OperatingSystem.IsWindows())
+            fs.File.SetUnixFileMode(temp, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+
         fs.File.Move(temp, path, overwrite: true);
     }
 }

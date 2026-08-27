@@ -1,12 +1,13 @@
 using System.IO.Abstractions.TestingHelpers;
 using Awizzy.Core.Persistence;
 using Awizzy.Core.Tests.TestDoubles;
+using TUnit.Core.Enums;
 
 namespace Awizzy.Core.Tests.Persistence;
 
 public class FileSecureStoreTests
 {
-    private static readonly AppPaths Paths = new(@"C:\appdata\Awizzy");
+    private static readonly AppPaths Paths = new(TestPaths.Root("appdata/Awizzy"));
 
     private static FileSecureStore CreateStore(MockFileSystem fs) =>
         new(fs, new FakeDataCipher(), Paths);
@@ -75,5 +76,22 @@ public class FileSecureStoreTests
         var store = CreateStore(new MockFileSystem());
 
         await store.DeleteAsync("never-existed");
+    }
+
+    [Test]
+    [ExcludeOn(OS.Windows)]
+    [System.Runtime.Versioning.UnsupportedOSPlatform("windows")]
+    public async Task SetAsync_RestrictsBlobAndDirectoryToUser()
+    {
+        var fs = new MockFileSystem();
+        var store = CreateStore(fs);
+
+        await store.SetAsync("sso-token:abc", "value");
+
+        var blob = fs.AllFiles.Single();
+        await Assert.That(fs.File.GetUnixFileMode(blob))
+            .IsEqualTo(UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        await Assert.That(fs.File.GetUnixFileMode(Paths.SecureDirectory))
+            .IsEqualTo(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
     }
 }

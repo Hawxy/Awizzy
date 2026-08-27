@@ -2,10 +2,13 @@ using System.Runtime.Versioning;
 using System.Security.Cryptography;
 using System.Text;
 using Awizzy.Core.Persistence;
+using TUnit.Core.Enums;
 
 namespace Awizzy.Core.Tests.Persistence;
 
+// SupportedOSPlatform satisfies the analyzer; RunOn is the runtime skip.
 [SupportedOSPlatform("windows")]
+[RunOn(OS.Windows)]
 public class DpapiDataCipherTests
 {
     [Test]

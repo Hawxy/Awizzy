@@ -10,6 +10,11 @@
         Width="1100" Height="680" MinWidth="900" MinHeight="420"
         BackgroundStyle="GradientSoft"
         WindowStartupLocation="CenterScreen">
+    <suki:SukiWindow.LogoContent>
+        <!-- Image cannot decode .ico; the png variant exists for macOS packaging anyway. -->
+        <Image Source="/Assets/app-icon.png" Width="18" Height="18"
+               Margin="6,0,0,0" VerticalAlignment="Center" />
+    </suki:SukiWindow.LogoContent>
     <suki:SukiWindow.Hosts>
         <suki:SukiDialogHost Manager="{Binding DialogManager}" />
         <suki:SukiToastHost Manager="{Binding ToastManager}" MaxToasts="4" />

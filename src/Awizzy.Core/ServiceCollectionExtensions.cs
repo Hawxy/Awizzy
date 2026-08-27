@@ -16,9 +16,20 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<AppPaths>();
 
         if (OperatingSystem.IsWindows())
+        {
             services.AddSingleton<IDataCipher, DpapiDataCipher>();
+        }
+        else if (OperatingSystem.IsMacOS())
+        {
+            // Resolved eagerly: the Keychain call is cheap, and a failure should surface
+            // at startup rather than on first save.
+            services.AddSingleton<IDataCipher>(
+                new AesGcmDataCipher(MacKeychainKeyProvider.GetOrCreateMasterKey()));
+        }
         else
-            throw new PlatformNotSupportedException("Only Windows is supported in this version.");
+        {
+            throw new PlatformNotSupportedException("Only Windows and macOS are supported in this version.");
+        }
 
         services.AddSingleton<CredentialsFilePathResolver>();
         services.AddSingleton<ICredentialsFileWriter, CredentialsFileWriter>();

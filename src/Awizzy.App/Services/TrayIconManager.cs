@@ -27,9 +27,13 @@ public sealed class TrayIconManager : IDisposable
         _showMainWindow = showMainWindow;
         _exit = exit;
 
+        // The macOS status bar renders a small PNG; .ico is the Windows tray format.
+        var iconAsset = OperatingSystem.IsMacOS()
+            ? "avares://Awizzy.App/Assets/tray-icon.png"
+            : "avares://Awizzy.App/Assets/app-icon.ico";
         _trayIcon = new TrayIcon
         {
-            Icon = new WindowIcon(AssetLoader.Open(new Uri("avares://Awizzy.App/Assets/app-icon.ico"))),
+            Icon = new WindowIcon(AssetLoader.Open(new Uri(iconAsset))),
             ToolTipText = "Awizzy",
         };
         _trayIcon.Clicked += (_, _) => _showMainWindow();

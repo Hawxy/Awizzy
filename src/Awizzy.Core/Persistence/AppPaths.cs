@@ -4,7 +4,7 @@ namespace Awizzy.Core.Persistence;
 public class AppPaths
 {
     public AppPaths()
-        : this(MigrateFromLegacyDirectory())
+        : this(DefaultRoot())
     {
     }
 
@@ -18,7 +18,18 @@ public class AppPaths
     public string SecureDirectory => Path.Combine(RootDirectory, "secure");
     public string LogDirectory => Path.Combine(RootDirectory, "logs");
 
-    /// <summary>Moves data from the pre-rename AwsProfileManager directory on first run.</summary>
+    private static string DefaultRoot()
+    {
+        if (OperatingSystem.IsMacOS())
+            return Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                "Library", "Application Support", "Awizzy");
+
+        return MigrateFromLegacyDirectory();
+    }
+
+    /// <summary>Moves data from the pre-rename AwsProfileManager directory on first run.
+    /// Windows-only history; macOS never had the old directory.</summary>
     private static string MigrateFromLegacyDirectory()
     {
         var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
