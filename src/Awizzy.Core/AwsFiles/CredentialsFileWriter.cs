@@ -91,11 +91,15 @@ public class CredentialsFileWriter(
         var temp = path + ".awizzy-tmp";
         fs.File.WriteAllText(temp, updated);
 
-        // The AWS CLI keeps this file at 0600; the temp file's mode survives the move,
-        // so set it there to avoid widening the real file on every write.
+        // The AWS CLI keeps this file at 0600. Setting the temp file first means the
+        // real file is never world-readable, even briefly; setting it again after the
+        // move covers IFileSystem implementations whose Move does not preserve the mode.
         if (!OperatingSystem.IsWindows())
             fs.File.SetUnixFileMode(temp, UnixFileMode.UserRead | UnixFileMode.UserWrite);
 
         fs.File.Move(temp, path, overwrite: true);
+
+        if (!OperatingSystem.IsWindows())
+            fs.File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
     }
 }

@@ -1,15 +1,17 @@
 # Awizzy
 
-A desktop AWS SSO credential manager: log into IAM Identity Center once, then start and
-stop role sessions that write short-lived credentials to `~/.aws/credentials`. Includes a
+A desktop AWS SSO credential manager. Sign into IAM Identity Center once, then start and
+stop role sessions that write short-lived credentials to your local AWS profile. Includes a
 local MCP server so AI tools (Claude Code, Codex, Cursor, ...) can manage sessions too.
 
-![Main window](docs/main-window.png)
+<p align="center">
+  <img src="docs/main-window.png" alt="Awizzy main window" width="720">
+</p>
 
 ## Platforms
 
-- **Windows** (x64) — secrets protected with DPAPI.
-- **macOS** (Apple Silicon) — secrets protected with an AES-256 key held in the login
+- **Windows** (x64) - secrets protected with DPAPI.
+- **macOS** (Apple Silicon) - secrets protected with an AES-256 key held in the login
   Keychain. Builds are currently unsigned: on first launch, right-click the app and
   choose Open (or run `xattr -dr com.apple.quarantine "/Applications/Awizzy.app"`).
   macOS may also show a one-time local-network prompt when the MCP server is enabled.

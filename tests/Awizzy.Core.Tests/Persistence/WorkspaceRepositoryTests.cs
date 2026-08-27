@@ -4,6 +4,7 @@ using Awizzy.Core.Persistence;
 using Awizzy.Core.Tests.TestDoubles;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
+using TUnit.Core.Enums;
 
 namespace Awizzy.Core.Tests.Persistence;
 
@@ -56,6 +57,20 @@ public class WorkspaceRepositoryTests
         await Assert.That(reloaded.Sessions).HasSingleItem();
         await Assert.That(reloaded.Sessions[0].ProfileName).IsEqualTo("acme-prod");
         await Assert.That(reloaded.Sessions[0].State).IsEqualTo(SessionState.Inactive);
+    }
+
+    [Test]
+    [ExcludeOn(OS.Windows)]
+    [System.Runtime.Versioning.UnsupportedOSPlatform("windows")]
+    public async Task SaveAsync_KeepsWorkspaceFileUserOnly()
+    {
+        var fs = new MockFileSystem();
+        var repository = CreateRepository(fs);
+
+        await repository.SaveAsync(repository.Load());
+
+        await Assert.That(fs.File.GetUnixFileMode(Paths.WorkspaceFile))
+            .IsEqualTo(UnixFileMode.UserRead | UnixFileMode.UserWrite);
     }
 
     [Test]

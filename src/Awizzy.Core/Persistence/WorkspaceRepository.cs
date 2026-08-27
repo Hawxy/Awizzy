@@ -45,9 +45,13 @@ public class WorkspaceRepository(
         // Atomic-ish replace: write to a temp file on the same volume, then move over the target.
         var temp = paths.WorkspaceFile + ".tmp";
         fs.File.WriteAllBytes(temp, ciphertext);
+        // Set on the temp file so the target is never briefly world-readable, and again
+        // after the move for IFileSystem implementations whose Move drops the mode.
         if (!OperatingSystem.IsWindows())
             fs.File.SetUnixFileMode(temp, UnixFileMode.UserRead | UnixFileMode.UserWrite);
         fs.File.Move(temp, paths.WorkspaceFile, overwrite: true);
+        if (!OperatingSystem.IsWindows())
+            fs.File.SetUnixFileMode(paths.WorkspaceFile, UnixFileMode.UserRead | UnixFileMode.UserWrite);
         return Task.CompletedTask;
     }
 
