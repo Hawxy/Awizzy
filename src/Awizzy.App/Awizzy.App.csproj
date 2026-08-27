@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
+    <!-- Release builds get the real version from the tag via -p:Version in CI. -->
+    <Version>0.1.0</Version>
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\app-icon.ico</ApplicationIcon>
@@ -21,6 +23,7 @@
     <PackageReference Include="CommunityToolkit.Mvvm" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
     <PackageReference Include="Karambolo.Extensions.Logging.File" />
+    <PackageReference Include="Velopack" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Awizzy.Core\Awizzy.Core.csproj" />

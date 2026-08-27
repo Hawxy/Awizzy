@@ -1,0 +1,48 @@
+# Tag a commit vX.Y.Z and push the tag; this publishes the app with Native AOT,
+# wraps it in a Velopack package (installer + delta updates), and creates the
+# GitHub release the in-app updater (UpdateService) reads.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Derive version from tag
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart("v")
+          "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Publish (Native AOT)
+        run: dotnet publish src/Awizzy.App -c Release -r win-x64 -o publish -p:Version=${{ env.VERSION }}
+
+      - name: Install vpk
+        run: dotnet tool install -g vpk --version 1.2.0
+
+      - name: Download previous release assets (enables delta packages)
+        run: vpk download github --repoUrl ${{ github.server_url }}/${{ github.repository }} --token ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true # the first release has nothing to download
+
+      - name: Pack
+        run: >-
+          vpk pack --packId Awizzy --packVersion ${{ env.VERSION }} --packDir publish
+          --mainExe Awizzy.App.exe --packTitle Awizzy --packAuthors Hawxy
+          --icon src/Awizzy.App/Assets/app-icon.ico
+
+      - name: Upload to GitHub release
+        run: >-
+          vpk upload github --repoUrl ${{ github.server_url }}/${{ github.repository }}
+          --token ${{ secrets.GITHUB_TOKEN }} --publish
+          --releaseName "Awizzy ${{ env.VERSION }}" --tag ${{ github.ref_name }}

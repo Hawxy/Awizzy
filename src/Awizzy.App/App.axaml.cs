@@ -66,6 +66,7 @@ public class App : Application
                 services.AddSingleton<Mcp.McpChangeNotifier>();
                 services.AddSingleton<Core.Abstractions.IMainThreadDispatcher, Services.AvaloniaMainThreadDispatcher>();
                 services.AddSingleton<Mcp.IMcpServerHost, Mcp.McpServerHost>();
+                services.AddSingleton<Services.UpdateService>();
                 services.AddSingleton<MainWindowViewModel>();
             })
             .Build();
@@ -126,6 +127,9 @@ public class App : Application
                 });
 
             desktop.ShutdownRequested += OnShutdownRequested;
+
+            if (!isDemo)
+                _ = _host.Services.GetRequiredService<Services.UpdateService>().CheckForUpdateAsync();
         }
 
         base.OnFrameworkInitializationCompleted();

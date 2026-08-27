@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore Awizzy.slnx
+
+      - name: Build (warnings as errors)
+        run: dotnet build Awizzy.slnx -c Release --no-restore
+
+      - name: Test
+        run: dotnet run --project tests/Awizzy.Core.Tests -c Release --no-build
+
+  # Catches Native AOT regressions (trim warnings, unsupported reflection) before a
+  # release tag hits them. Skipped on PRs to keep feedback fast.
+  publish-smoke:
+    if: github.event_name == 'push'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Publish (Native AOT)
+        run: dotnet publish src/Awizzy.App -c Release -r win-x64 -o publish

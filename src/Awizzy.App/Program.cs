@@ -1,4 +1,5 @@
 using Avalonia;
+using Velopack;
 
 namespace Awizzy.App;
 
@@ -8,6 +9,9 @@ internal static class Program
     [STAThread]
     public static void Main(string[] args)
     {
+        // Velopack's install/update/uninstall hooks; must run before anything else.
+        VelopackApp.Build().Run();
+
         // One instance per mode (demo and real may coexist); a second launch
         // signals the first to bring its window to the front, then exits.
         var suffix = args.Contains("--demo") ? "-demo" : string.Empty;
