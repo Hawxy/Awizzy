@@ -12,7 +12,7 @@ public partial class IntegrationItemViewModel(SsoIntegration integration, TimePr
     public string PortalUrl => Integration.PortalUrl;
     public string Region => Integration.Region;
     public bool IsLoggedIn => Integration.IsLoggedIn(time);
-    public string StatusText => IsLoggedIn ? "Logged in" : "Logged out";
+    public string StatusText => $"{(IsLoggedIn ? "Logged in" : "Logged out")} {Region}";
     public bool CanLogin => !IsLoggedIn && !IsSyncing;
 
     public string LastSyncText

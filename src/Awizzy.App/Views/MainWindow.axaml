@@ -211,7 +211,7 @@
                         <TextBlock Text="Add integration" />
                     </StackPanel>
                 </Button>
-                <ListBox Grid.Row="2"
+                <ListBox Grid.Row="2" x:Name="IntegrationsList"
                          ItemsSource="{Binding Integrations}"
                          SelectedItem="{Binding SelectedIntegration}"
                          Background="Transparent">
@@ -238,7 +238,6 @@
                                         </Ellipse.Fill>
                                     </Ellipse>
                                     <TextBlock Text="{Binding StatusText}" FontSize="12" Opacity="0.7" />
-                                    <TextBlock Text="{Binding Region}" FontSize="12" Opacity="0.7" />
                                 </StackPanel>
                                 <TextBlock Text="{Binding LastSyncText}" FontSize="11" Opacity="0.55" />
                                 <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,4,0,0">

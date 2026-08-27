@@ -177,7 +177,18 @@ public partial class MainWindowViewModel : ObservableObject
         _searchDebounceTimer.Start();
     }
 
-    partial void OnSelectedIntegrationChanged(IntegrationItemViewModel? value) => RebuildSessions();
+    partial void OnSelectedIntegrationChanged(IntegrationItemViewModel? value)
+    {
+        // A single integration cannot narrow the list, so keep it unselected
+        // rather than showing a filter that does nothing. Posted because the
+        // ListBox ignores a reset raised inside its own binding write.
+        if (value is not null && Integrations.Count == 1)
+        {
+            Dispatcher.UIThread.Post(() => SelectedIntegration = null);
+            return;
+        }
+        RebuildSessions();
+    }
 
     partial void OnShowFavoritesOnlyChanged(bool value) => RebuildSessions();
 
