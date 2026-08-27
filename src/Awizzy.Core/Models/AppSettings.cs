@@ -15,4 +15,8 @@ public class AppSettings
     public bool McpServerEnabled { get; set; }
 
     public int McpServerPort { get; set; } = 52100;
+
+    /// <summary>Sessions (as AccountId/RoleName keys) excluded from MCP control: still listed,
+    /// but MCP tools refuse to start or stop them or issue console URLs.</summary>
+    public List<string> McpExcludedRoles { get; set; } = [];
 }

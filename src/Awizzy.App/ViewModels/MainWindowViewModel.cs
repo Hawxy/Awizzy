@@ -28,6 +28,7 @@ public partial class MainWindowViewModel : ObservableObject
     private readonly IIntegrationService _integrationService;
     private readonly ISessionManager _sessionManager;
     private readonly IDialogService _dialogService;
+    private readonly IClipboardService _clipboard;
     private readonly SessionActionsService _sessionActions;
     private readonly TimeProvider _time;
     private readonly IMcpServerHost _mcpHost;
@@ -43,6 +44,7 @@ public partial class MainWindowViewModel : ObservableObject
         IIntegrationService integrationService,
         ISessionManager sessionManager,
         IDialogService dialogService,
+        IClipboardService clipboard,
         SessionActionsService sessionActions,
         TimeProvider time,
         IMcpServerHost mcpHost,
@@ -57,6 +59,7 @@ public partial class MainWindowViewModel : ObservableObject
         _integrationService = integrationService;
         _sessionManager = sessionManager;
         _dialogService = dialogService;
+        _clipboard = clipboard;
         _sessionActions = sessionActions;
         _time = time;
 
@@ -327,6 +330,7 @@ public partial class MainWindowViewModel : ObservableObject
             settings.Theme = result.Theme;
             settings.McpServerEnabled = result.McpServerEnabled;
             settings.McpServerPort = result.McpServerPort;
+            settings.McpExcludedRoles = result.McpExcludedRoles.ToList();
             await _state.SaveAsync();
             ThemeApplier.Apply(result.Theme);
             RebuildSessions();
@@ -370,6 +374,28 @@ public partial class MainWindowViewModel : ObservableObject
 
     private Task RunSessionActionAsync(SessionItemViewModel item, Func<Task<string>> action) =>
         GuardAsync(async () => ShowToast(item.DisplayName, await action(), NotificationType.Information));
+
+    [RelayCommand]
+    private Task CopyMcpSetupAsync(string provider)
+    {
+        var port = _mcpHost.Port ?? _state.Workspace.Settings.McpServerPort;
+        var url = $"http://localhost:{port}";
+        var (label, text) = provider switch
+        {
+            "claude" => ("Claude Code", $"claude mcp add --transport http awizzy {url}"),
+            "codex" => ("Codex CLI", $"codex mcp add awizzy --url {url}"),
+            "gemini" => ("Gemini CLI", $"gemini mcp add --transport http awizzy {url}"),
+            "cursor" => ("Cursor", $$"""{ "mcpServers": { "awizzy": { "url": "{{url}}" } } }"""),
+            "vscode" => ("VS Code", $$"""{ "servers": { "awizzy": { "type": "http", "url": "{{url}}" } } }"""),
+            _ => throw new ArgumentOutOfRangeException(nameof(provider)),
+        };
+
+        return GuardAsync(async () =>
+        {
+            await _clipboard.SetTextAsync(text);
+            ShowToast(label, "MCP setup command copied to clipboard.", NotificationType.Information);
+        });
+    }
 
     [RelayCommand]
     private async Task EditSessionAsync(SessionItemViewModel item)

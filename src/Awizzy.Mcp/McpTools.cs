@@ -24,7 +24,8 @@ public record SessionInfo(
     string Region,
     string State,
     DateTimeOffset? CredentialsExpireAt,
-    string? Error);
+    string? Error,
+    bool ControlDisabled);
 
 public record SyncInfo(string Integration, int Added, int Removed, int Total);
 
@@ -53,7 +54,9 @@ public class McpTools(
 
     [McpServerTool(Name = "list_sessions")]
     [Description("Lists AWS sessions (account/role pairs). An Active session has live credentials written to the "
-                 + "AWS credentials file under its profile name, usable with the AWS CLI via --profile.")]
+                 + "AWS credentials file under its profile name, usable with the AWS CLI via --profile. "
+                 + "A session with controlDisabled=true is excluded from MCP control in the app settings: "
+                 + "it cannot be started or stopped and no console URL can be issued for it.")]
     public Task<IReadOnlyList<SessionInfo>> ListSessions(
         [Description("Optional integration alias to filter by.")] string? integration = null) =>
         dispatcher.InvokeAsync<IReadOnlyList<SessionInfo>>(() =>
@@ -78,6 +81,7 @@ public class McpTools(
         dispatcher.InvokeAsync(async () =>
         {
             var session = ResolveSession(account, role);
+            EnsureControllable(session);
             try
             {
                 await sessionManager.StartSessionAsync(session.Id, ct);
@@ -99,6 +103,7 @@ public class McpTools(
         dispatcher.InvokeAsync(async () =>
         {
             var session = ResolveSession(account, role);
+            EnsureControllable(session);
             try
             {
                 await sessionManager.StopSessionAsync(session.Id, ct);
@@ -149,6 +154,7 @@ public class McpTools(
         dispatcher.InvokeAsync(async () =>
         {
             var session = ResolveSession(account, role);
+            EnsureControllable(session);
             var credentials = sessionManager.GetCachedCredentials(session.Id)
                 ?? throw new McpException($"Session {session.DisplayName} is not active; start it first with start_session.");
 
@@ -162,9 +168,19 @@ public class McpTools(
             }
         });
 
-    private static SessionInfo ToInfo(AwsSession s) => new(
+    private SessionInfo ToInfo(AwsSession s) => new(
         s.AccountId, s.AccountName, s.RoleName, s.ProfileName, s.Region,
-        s.State.ToString(), s.CredentialsExpireAt, s.ErrorMessage);
+        s.State.ToString(), s.CredentialsExpireAt, s.ErrorMessage, IsControlDisabled(s));
+
+    private bool IsControlDisabled(AwsSession session) =>
+        state.Workspace.Settings.McpExcludedRoles.Contains(session.McpRoleKey, StringComparer.OrdinalIgnoreCase);
+
+    private void EnsureControllable(AwsSession session)
+    {
+        if (IsControlDisabled(session))
+            throw new McpException(
+                $"{session.DisplayName} is excluded from MCP control in the Awizzy settings.");
+    }
 
     private AwsSession ResolveSession(string account, string role)
     {

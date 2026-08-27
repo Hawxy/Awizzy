@@ -88,6 +88,46 @@ public class McpToolsTests
     }
 
     [Test]
+    public async Task ListSessions_FlagsExcludedRoles()
+    {
+        var integration = AddIntegration("Acme");
+        AddSession(integration, "111111111111", "prod", "Admin");
+        AddSession(integration, "111111111111", "prod", "ReadOnly");
+        _workspace.Settings.McpExcludedRoles.Add("111111111111/Admin");
+
+        var result = await _tools.ListSessions();
+
+        await Assert.That(result).Count().IsEqualTo(2);
+        await Assert.That(result.Single(s => s.RoleName == "Admin").ControlDisabled).IsTrue();
+        await Assert.That(result.Single(s => s.RoleName == "ReadOnly").ControlDisabled).IsFalse();
+    }
+
+    [Test]
+    public async Task StartSession_ExcludedRole_RefusesWithClearError()
+    {
+        var integration = AddIntegration("Acme");
+        AddSession(integration, "111111111111", "prod", "Admin");
+        _workspace.Settings.McpExcludedRoles.Add("111111111111/Admin");
+
+        await Assert.That(async () => { await _tools.StartSession("prod", "Admin", CancellationToken.None); })
+            .Throws<McpException>().WithMessageContaining("excluded from MCP control");
+        await _sessionManager.DidNotReceive().StartSessionAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+    }
+
+    [Test]
+    public async Task GetConsoleUrl_ExcludedRole_Refuses()
+    {
+        var integration = AddIntegration("Acme");
+        var session = AddSession(integration, "111111111111", "prod", "Admin");
+        _sessionManager.GetCachedCredentials(session.Id)
+            .Returns(new RoleCredentialSet("AKIA", "secret", "token", _time.GetUtcNow().AddHours(1)));
+        _workspace.Settings.McpExcludedRoles.Add("111111111111/Admin");
+
+        await Assert.That(async () => { await _tools.GetConsoleUrl("prod", "Admin", CancellationToken.None); })
+            .Throws<McpException>().WithMessageContaining("excluded from MCP control");
+    }
+
+    [Test]
     public async Task StartSession_ResolvesByAccountName()
     {
         var integration = AddIntegration("Acme");

@@ -8,7 +8,18 @@ public record SettingsResult(
     string? CredentialsFilePath,
     ThemeMode Theme,
     bool McpServerEnabled,
-    int McpServerPort);
+    int McpServerPort,
+    IReadOnlyList<string> McpExcludedRoles);
+
+/// <summary>One session in the settings dialog's MCP exclusion list.</summary>
+public partial class McpRoleExclusionViewModel(string displayName, string roleKey, bool isExcluded) : ObservableObject
+{
+    public string DisplayName { get; } = displayName;
+    public string RoleKey { get; } = roleKey;
+
+    [ObservableProperty]
+    private bool _isExcluded = isExcluded;
+}
 
 public partial class SettingsDialogViewModel : ObservableObject
 {
@@ -29,6 +40,14 @@ public partial class SettingsDialogViewModel : ObservableObject
 
     public required string DefaultCredentialsPath { get; init; }
 
+    public required IReadOnlyList<McpRoleExclusionViewModel> McpRoles { get; init; }
+
+    /// <summary>Exclusion keys with no matching session right now (integration logged out);
+    /// kept so they apply again after the roles come back.</summary>
+    public required IReadOnlyList<string> UnlistedMcpExclusions { get; init; }
+
+    public bool HasMcpRoles => McpRoles.Count > 0;
+
     public ThemeMode[] Themes { get; } = [ThemeMode.System, ThemeMode.Light, ThemeMode.Dark];
 
     public SettingsResult ToResult()
@@ -46,6 +65,9 @@ public partial class SettingsDialogViewModel : ObservableObject
             path.Length == 0 ? null : path,
             Theme,
             McpServerEnabled,
-            (int)port);
+            (int)port,
+            UnlistedMcpExclusions
+                .Concat(McpRoles.Where(r => r.IsExcluded).Select(r => r.RoleKey))
+                .ToList());
     }
 }

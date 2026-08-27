@@ -37,6 +37,24 @@
             </Grid>
             <TextBlock Text="Lets local AI tools (e.g. Claude Code) list, start, and stop sessions over HTTP on localhost. Any process on this machine can reach it while enabled."
                        FontSize="12" Opacity="0.7" TextWrapping="Wrap" />
+            <StackPanel Spacing="4" Margin="0,8,0,0"
+                        IsVisible="{Binding HasMcpRoles}" IsEnabled="{Binding McpServerEnabled}">
+                <TextBlock Text="Roles excluded from MCP control (still listed, but cannot be started, stopped, or opened in the console):"
+                           FontSize="12" Opacity="0.7" TextWrapping="Wrap" />
+                <Border BorderBrush="{DynamicResource SukiControlBorderBrush}" BorderThickness="1"
+                        CornerRadius="6" Padding="8,4">
+                    <ScrollViewer MaxHeight="140">
+                        <ItemsControl ItemsSource="{Binding McpRoles}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:McpRoleExclusionViewModel">
+                                    <CheckBox IsChecked="{Binding IsExcluded}" Content="{Binding DisplayName}"
+                                              FontSize="12" MinHeight="26" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Border>
+            </StackPanel>
         </StackPanel>
         <TextBlock x:Name="ErrorText" Foreground="{DynamicResource SukiDangerColor}" TextWrapping="Wrap" IsVisible="False" />
         <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" Margin="0,8,0,0">

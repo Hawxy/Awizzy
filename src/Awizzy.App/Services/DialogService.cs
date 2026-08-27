@@ -53,8 +53,11 @@ public class DialogService(IServiceProvider services) : IDialogService
 
     public async Task<SettingsResult?> ShowSettingsAsync()
     {
-        var settings = services.GetRequiredService<WorkspaceState>().Workspace.Settings;
+        var workspace = services.GetRequiredService<WorkspaceState>().Workspace;
+        var settings = workspace.Settings;
         var resolver = services.GetRequiredService<Awizzy.Core.AwsFiles.CredentialsFilePathResolver>();
+        var excluded = settings.McpExcludedRoles.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var listedKeys = workspace.Sessions.Select(s => s.McpRoleKey).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var viewModel = new SettingsDialogViewModel
         {
             RefreshMarginMinutes = (decimal)settings.RefreshMargin.TotalMinutes,
@@ -63,6 +66,15 @@ public class DialogService(IServiceProvider services) : IDialogService
             McpServerEnabled = settings.McpServerEnabled,
             McpServerPort = settings.McpServerPort,
             DefaultCredentialsPath = resolver.GetDefaultPath(),
+            McpRoles = workspace.Sessions
+                .OrderBy(s => s.AccountName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(s => s.RoleName, StringComparer.OrdinalIgnoreCase)
+                .Select(s => new McpRoleExclusionViewModel(
+                    s.DisplayName, s.McpRoleKey, excluded.Contains(s.McpRoleKey)))
+                .ToList(),
+            UnlistedMcpExclusions = settings.McpExcludedRoles
+                .Where(key => !listedKeys.Contains(key))
+                .ToList(),
         };
         var dialog = new SettingsDialog { DataContext = viewModel };
         return await dialog.ShowDialog<SettingsResult?>(Owner);

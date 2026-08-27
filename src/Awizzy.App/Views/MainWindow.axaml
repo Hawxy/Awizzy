@@ -149,6 +149,19 @@
                     </Ellipse>
                     <TextBlock Text="{Binding McpStatusText}" FontSize="11" Opacity="0.7"
                                VerticalAlignment="Center" />
+                    <Button Classes="Basic" Padding="4,2" VerticalAlignment="Center"
+                            ToolTip.Tip="Copy the setup command for an AI tool">
+                        <PathIcon Data="{StaticResource IconCopy}" Width="11" Height="11" />
+                        <Button.Flyout>
+                            <MenuFlyout>
+                                <MenuItem Header="Claude Code" Command="{Binding CopyMcpSetupCommand}" CommandParameter="claude" />
+                                <MenuItem Header="Codex CLI" Command="{Binding CopyMcpSetupCommand}" CommandParameter="codex" />
+                                <MenuItem Header="Gemini CLI" Command="{Binding CopyMcpSetupCommand}" CommandParameter="gemini" />
+                                <MenuItem Header="Cursor (JSON)" Command="{Binding CopyMcpSetupCommand}" CommandParameter="cursor" />
+                                <MenuItem Header="VS Code (JSON)" Command="{Binding CopyMcpSetupCommand}" CommandParameter="vscode" />
+                            </MenuFlyout>
+                        </Button.Flyout>
+                    </Button>
                 </StackPanel>
             </Grid>
         </Border>

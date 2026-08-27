@@ -27,6 +27,10 @@ public class AwsSession
 
     public string DisplayName => $"{AccountName} / {RoleName}";
 
+    /// <summary>Stable key for MCP role exclusions; survives sessions being recreated by sync.</summary>
+    [JsonIgnore]
+    public string McpRoleKey => $"{AccountId}/{RoleName}";
+
     public bool HasSameIdentity(Guid integrationId, string accountId, string roleName) =>
         IntegrationId == integrationId
         && string.Equals(AccountId, accountId, StringComparison.Ordinal)
