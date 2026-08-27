@@ -12,11 +12,11 @@ namespace Awizzy.App.Services;
 public class UpdateService(ISukiToastManager toastManager, ILogger<UpdateService> logger)
 {
     private const string RepoUrl = "https://github.com/Hawxy/Awizzy";
-    private static readonly TimeSpan CheckInterval = TimeSpan.FromHours(1);
+    private static readonly TimeSpan CheckInterval = TimeSpan.FromMinutes(30);
 
     private string? _offeredVersion;
 
-    /// <summary>Checks once at startup, then hourly; the app lives in the tray for days.
+    /// <summary>Checks once at startup, then every half hour; the app lives in the tray for days.
     /// Started from the UI thread so toast continuations stay on it.</summary>
     public async Task RunPeriodicChecksAsync()
     {

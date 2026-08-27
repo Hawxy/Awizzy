@@ -45,7 +45,15 @@ public class SessionManager(
         }
         catch (Exception ex)
         {
-            SetError(session, ex);
+            // The rethrown exception is the caller's to surface (the UI shows a
+            // toast); the row itself returns to Inactive rather than pinning the
+            // error. Background refresh failures still use the Error state, as
+            // they have no caller to report to.
+            lock (_cacheLock)
+                _credentialCache.Remove(session.Id);
+            session.ErrorMessage = null;
+            SetState(session, SessionState.Inactive);
+            logger.LogError(ex, "Session {Session} failed to start.", session.DisplayName);
             throw;
         }
     }

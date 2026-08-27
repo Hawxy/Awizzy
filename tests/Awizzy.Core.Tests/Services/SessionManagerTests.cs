@@ -103,15 +103,15 @@ public class SessionManagerTests
     }
 
     [Test]
-    public async Task StartSessionAsync_WhenSsoSessionExpired_SetsErrorAndRethrows()
+    public async Task StartSessionAsync_WhenSsoSessionExpired_RevertsToInactiveAndRethrows()
     {
         _portal.GetRoleCredentialsAsync(Arg.Any<SsoIntegration>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(_ => Task.FromException<RoleCredentialSet>(new SsoSessionExpiredException("expired")));
 
         await Assert.That(async () => { await _manager.StartSessionAsync(_session.Id); })
             .Throws<SsoSessionExpiredException>();
-        await Assert.That(_session.State).IsEqualTo(SessionState.Error);
-        await Assert.That(_session.ErrorMessage).Contains("log in");
+        await Assert.That(_session.State).IsEqualTo(SessionState.Inactive);
+        await Assert.That(_session.ErrorMessage).IsNull();
     }
 
     [Test]
