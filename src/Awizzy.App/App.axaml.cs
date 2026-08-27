@@ -132,7 +132,7 @@ public class App : Application
             desktop.ShutdownRequested += OnShutdownRequested;
 
             if (!isDemo)
-                _ = _host.Services.GetRequiredService<Services.UpdateService>().CheckForUpdateAsync();
+                _ = _host.Services.GetRequiredService<Services.UpdateService>().RunPeriodicChecksAsync();
         }
 
         base.OnFrameworkInitializationCompleted();

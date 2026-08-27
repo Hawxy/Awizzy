@@ -12,8 +12,25 @@ namespace Awizzy.App.Services;
 public class UpdateService(ISukiToastManager toastManager, ILogger<UpdateService> logger)
 {
     private const string RepoUrl = "https://github.com/Hawxy/Awizzy";
+    private static readonly TimeSpan CheckInterval = TimeSpan.FromHours(1);
 
-    public async Task CheckForUpdateAsync()
+    private string? _offeredVersion;
+
+    /// <summary>Checks once at startup, then hourly; the app lives in the tray for days.
+    /// Started from the UI thread so toast continuations stay on it.</summary>
+    public async Task RunPeriodicChecksAsync()
+    {
+        if (!await CheckForUpdateAsync())
+            return;
+
+        using var timer = new PeriodicTimer(CheckInterval);
+        while (await timer.WaitForNextTickAsync())
+            await CheckForUpdateAsync();
+    }
+
+    /// <summary>Returns false when the app isn't running from a Velopack install
+    /// (local builds, dotnet run), meaning further checks are pointless.</summary>
+    private async Task<bool> CheckForUpdateAsync()
     {
         UpdateManager manager;
         UpdateInfo? update;
@@ -21,19 +38,25 @@ public class UpdateService(ISukiToastManager toastManager, ILogger<UpdateService
         {
             manager = new UpdateManager(new GithubSource(RepoUrl, accessToken: null, prerelease: false));
             if (!manager.IsInstalled)
-                return;
+                return false;
 
             update = await manager.CheckForUpdatesAsync();
         }
         catch (Exception ex)
         {
-            // A failed background check is logged, never surfaced.
+            // A failed background check is logged, never surfaced; retry on the next tick.
             logger.LogWarning(ex, "Update check failed.");
-            return;
+            return true;
         }
 
         if (update is null)
-            return;
+            return true;
+
+        // Offer each version once; a dismissed toast should not reappear every hour.
+        var version = update.TargetFullRelease.Version.ToString();
+        if (version == _offeredVersion)
+            return true;
+        _offeredVersion = version;
 
         toastManager.CreateToast()
             .WithTitle("Update available")
@@ -42,6 +65,7 @@ public class UpdateService(ISukiToastManager toastManager, ILogger<UpdateService
             .WithActionButton("Install and restart", toast => _ = DownloadAndApplyAsync(manager, update), dismissOnClick: true)
             .Dismiss().ByClicking()
             .Queue();
+        return true;
     }
 
     private async Task DownloadAndApplyAsync(UpdateManager manager, UpdateInfo update)

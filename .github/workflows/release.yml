@@ -44,10 +44,11 @@ jobs:
           --mainExe Awizzy.App.exe --packTitle Awizzy --packAuthors Hawxy
           --channel win --icon src/Awizzy.App/Assets/app-icon.ico
 
+      # --merge allows re-runs to add assets to a release that already exists.
       - name: Upload to GitHub release
         run: >-
           vpk upload github --repoUrl ${{ github.server_url }}/${{ github.repository }}
-          --token ${{ secrets.GITHUB_TOKEN }} --publish
+          --token ${{ secrets.GITHUB_TOKEN }} --publish --merge
           --releaseName "Awizzy ${{ env.VERSION }}" --tag ${{ github.ref_name }} --channel win
 
   # Runs after the windows job so both uploads target the release it created.
@@ -93,8 +94,9 @@ jobs:
           --mainExe Awizzy.App --packTitle Awizzy --packAuthors Hawxy
           --channel osx --icon app-icon.icns
 
+      # --merge adds the osx assets to the release the windows job created.
       - name: Upload to GitHub release
         run: >-
           vpk upload github --repoUrl ${{ github.server_url }}/${{ github.repository }}
-          --token ${{ secrets.GITHUB_TOKEN }} --publish
+          --token ${{ secrets.GITHUB_TOKEN }} --publish --merge
           --releaseName "Awizzy ${{ env.VERSION }}" --tag ${{ github.ref_name }} --channel osx
